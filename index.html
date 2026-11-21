@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>صدى AI - مدير التطبيقات الصوتي الذكي</title>
+    <title>صدى AI - نظام التشغيل الصوتي الداخلي</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -44,188 +44,194 @@
 <body class="min-h-screen flex flex-col justify-between overflow-x-hidden">
 
     <!-- Header -->
-    <header class="w-full px-5 py-4 flex items-center justify-between border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-30">
+    <header class="w-full px-5 py-3.5 flex items-center justify-between border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40">
         <div class="flex items-center gap-3">
-            <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-sky-500 to-emerald-400 text-slate-950 flex items-center justify-center text-xl font-black shadow-lg shadow-sky-500/20">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-emerald-400 text-slate-950 flex items-center justify-center text-lg font-black shadow-lg shadow-sky-500/20">
                 <i class="fa-solid fa-wave-square"></i>
             </div>
             <div>
-                <h1 class="text-lg font-black text-white leading-tight">صدى <span class="text-sky-400">Voice OS</span></h1>
-                <p class="text-[11px] text-slate-400 font-semibold">إدارة شاملة لتطبيقات الجهاز بالصوت</p>
+                <h1 class="text-base sm:text-lg font-black text-white leading-tight">صدى <span class="text-sky-400">Voice OS</span></h1>
+                <p class="text-[11px] text-slate-400 font-semibold">تشغيل التطبيقات داخل المنصة بالصوت</p>
             </div>
         </div>
 
-        <div id="statusBadge" class="px-3.5 py-1.5 rounded-full text-xs font-bold bg-slate-900 text-sky-400 border border-sky-500/30 flex items-center gap-2">
-            <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
-            <span id="statusText">جاهز للتفعيل</span>
+        <div class="flex items-center gap-2">
+            <button id="homeReturnBtn" onclick="closeEmbeddedApp()" class="hidden px-3 py-1.5 rounded-full text-xs font-black bg-amber-500 text-slate-950 hover:bg-amber-400 transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-house"></i>
+                <span>الرئيسية</span>
+            </button>
+            <div id="statusBadge" class="px-3 py-1.5 rounded-full text-xs font-bold bg-slate-900 text-sky-400 border border-sky-500/30 flex items-center gap-2">
+                <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+                <span id="statusText">المس للبدء</span>
+            </div>
         </div>
     </header>
 
-    <!-- Direct Real App Launch Banner (Bypasses Browser Popup Blockers) -->
-    <div id="launchBanner" class="hidden w-full max-w-4xl mx-auto px-4 pt-4">
-        <div class="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-4 shadow-xl flex items-center justify-between gap-3 border border-emerald-300/40">
-            <div class="flex items-center gap-3">
-                <i id="launchBannerIcon" class="fa-brands fa-youtube text-3xl text-white"></i>
-                <div>
-                    <p id="launchBannerTitle" class="text-sm font-black text-white">جاري فتح التطبيق...</p>
-                    <p id="launchBannerSub" class="text-xs text-emerald-100">اضغط هنا إذا منع المتصفح الفتح التلقائي</p>
+    <!-- IN-APP EMBEDDED WORKSPACE (Opens inside the platform without leaving!) -->
+    <section id="embeddedWorkspace" class="hidden w-full max-w-4xl mx-auto px-4 pt-4 z-30">
+        <div class="bg-slate-900 border-2 border-sky-500/50 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+            <!-- Workspace Top Bar -->
+            <div class="bg-slate-950 px-4 py-3 flex items-center justify-between border-b border-slate-800">
+                <div class="flex items-center gap-2.5">
+                    <i id="workspaceIcon" class="fa-brands fa-youtube text-xl text-red-500"></i>
+                    <span id="workspaceTitle" class="text-sm font-black text-white">مشغل يوتيوب الداخلي</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-[11px] text-emerald-400 font-bold hidden sm:inline">قل "رجوع" أو "اغلق" للعودة</span>
+                    <button onclick="closeEmbeddedApp()" class="bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white px-3 py-1 rounded-xl text-xs font-black transition-all">
+                        إغلاق <i class="fa-solid fa-xmark mr-1"></i>
+                    </button>
                 </div>
             </div>
-            <a id="directLaunchLink" href="#" target="_blank" rel="noopener noreferrer" class="bg-white text-slate-950 font-black px-5 py-2.5 rounded-xl text-xs sm:text-sm shadow-md hover:bg-emerald-50 transition-all shrink-0">
-                فتح الآن <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>
-            </a>
+
+            <!-- Dynamic Content Area Inside Platform -->
+            <div id="workspaceBody" class="w-full min-h-[260px] sm:min-h-[340px] bg-black flex flex-col items-center justify-center relative">
+                <!-- Video / Map / Quran / Reader injected here -->
+            </div>
         </div>
-    </div>
+    </section>
 
     <!-- Main Interactive Area -->
-    <main class="flex-1 w-full max-w-4xl mx-auto px-4 py-5 flex flex-col gap-5">
+    <main class="flex-1 w-full max-w-4xl mx-auto px-4 py-4 flex flex-col gap-4">
 
-        <!-- Central Voice Hub (Tap anywhere here to activate or speak) -->
-        <section onclick="activateVoiceEngine()" class="w-full bg-slate-900/70 border border-slate-800 hover:border-sky-500/50 rounded-3xl p-6 flex flex-col items-center text-center cursor-pointer transition-all shadow-2xl relative overflow-hidden">
-            <div id="micOrb" class="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-gradient-to-tr from-sky-500 to-cyan-400 text-slate-950 flex flex-col items-center justify-center shadow-xl transition-all duration-300 mb-4">
-                <i id="micIcon" class="fa-solid fa-microphone text-4xl mb-1"></i>
+        <!-- Central Voice Hub (Always present so blind user never loses voice control) -->
+        <section onclick="activateVoiceEngine()" class="w-full bg-slate-900/80 border border-slate-800 hover:border-sky-500/50 rounded-3xl p-5 flex flex-col items-center text-center cursor-pointer transition-all shadow-2xl relative overflow-hidden">
+            <div id="micOrb" class="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-tr from-sky-500 to-cyan-400 text-slate-950 flex flex-col items-center justify-center shadow-xl transition-all duration-300 mb-3">
+                <i id="micIcon" class="fa-solid fa-microphone text-3xl sm:text-4xl mb-1"></i>
                 <span id="micLabel" class="text-[11px] font-black">اضغط للبدء</span>
             </div>
 
             <div class="w-full max-w-xl space-y-2">
-                <p id="userTranscript" class="text-sm sm:text-base font-bold text-sky-300 min-h-[24px]">
-                    اضغط على الدائرة الزرقاء مرة واحدة ثم قل اسم أي تطبيق أو أمر...
+                <p id="userTranscript" class="text-sm font-bold text-sky-300 min-h-[22px]">
+                    اضغط الدائرة الزرقاء مرة واحدة ثم تكلم بحرية...
                 </p>
-                <div class="p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800/90">
+                <div class="p-3 rounded-2xl bg-slate-950/90 border border-slate-800/90">
                     <p id="assistantReply" class="text-sm sm:text-base font-semibold text-emerald-300 leading-relaxed">
-                        مرحباً بك في نظام صدى. قل مثلاً: "افتح يوتيوب وشغل قرآن"، "افتح واتساب"، "افتح تيليجرام"، أو "اتصل بـ 0770...".
+                        أهلاً بك. كل التطبيقات تفتح هنا داخل المنصة بدون أن تخرج منها. جرب قول: "شغل قرآن"، "افتح يوتيوب شرح مختبرات"، "افتح الخرائط"، أو "احسب 15 في 6".
                     </p>
                 </div>
             </div>
 
-            <!-- Fallback Text Command Bar (Always accessible if mic is blocked in preview) -->
-            <form onsubmit="handleTextCommand(event)" onclick="event.stopPropagation()" class="w-full max-w-xl mt-4 flex gap-2">
-                <input id="commandInput" type="text" placeholder="أو اكتب أمرك الصوتي هنا للتجربة المباشرة..." class="flex-1 bg-slate-950 border border-slate-700 focus:border-sky-400 rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none">
-                <button type="submit" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-black px-5 py-3 rounded-2xl text-sm transition-all flex items-center gap-2 shrink-0">
+            <!-- Fallback Text Command Bar -->
+            <form onsubmit="handleTextCommand(event)" onclick="event.stopPropagation()" class="w-full max-w-xl mt-3 flex gap-2">
+                <input id="commandInput" type="text" placeholder="اكتب أمرك هنا للتجربة الفورية (مثلاً: شغل قرآن)..." class="flex-1 bg-slate-950 border border-slate-700 focus:border-sky-400 rounded-2xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none">
+                <button type="submit" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-black px-5 py-2.5 rounded-2xl text-sm transition-all flex items-center gap-2 shrink-0">
                     <span>تنفيذ</span>
                     <i class="fa-solid fa-paper-plane"></i>
                 </button>
             </form>
         </section>
 
-        <!-- Supported Smart Apps Grid (Real Launchers + Voice Triggers) -->
-        <section class="w-full">
-            <div class="flex items-center justify-between mb-3 px-1">
-                <h2 class="text-sm font-black text-slate-300 flex items-center gap-2">
-                    <i class="fa-solid fa-grid-2 text-sky-400"></i>
-                    <span>التطبيقات المدعومة بالتحكم الصوتي المباشر</span>
+        <!-- Supported Internal Smart Apps Grid -->
+        <section id="appsSection" class="w-full">
+            <div class="flex items-center justify-between mb-2.5 px-1">
+                <h2 class="text-xs sm:text-sm font-black text-slate-300 flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-sky-400"></i>
+                    <span>تطبيقات مدمجة تعمل داخل المنصة بالصوت</span>
                 </h2>
-                <span class="text-[11px] text-slate-400">تفتح فعلياً على جهازك</span>
+                <span class="text-[11px] text-emerald-400 font-bold">بدون مغادرة الشاشة</span>
             </div>
 
             <div id="appsGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <!-- Cards populated dynamically by JS -->
+                <!-- Populated by JS -->
             </div>
         </section>
 
         <!-- Recent Voice Actions Log -->
-        <section class="w-full bg-slate-900/50 border border-slate-800/80 rounded-3xl p-4">
+        <section class="w-full bg-slate-900/50 border border-slate-800/80 rounded-3xl p-3.5">
             <h3 class="text-xs font-black text-slate-400 mb-2 flex items-center gap-2">
                 <i class="fa-solid fa-clock-rotate-left text-emerald-400"></i>
-                <span>سجل الأوامر المنفذة</span>
+                <span>سجل العمليات الصوتية</span>
             </h3>
-            <div id="actionLog" class="space-y-1.5 text-xs text-slate-300 max-h-32 overflow-y-auto">
-                <div class="text-slate-500 italic">لا توجد أوامر منفذة بعد...</div>
+            <div id="actionLog" class="space-y-1.5 text-xs text-slate-300 max-h-28 overflow-y-auto">
+                <div class="text-slate-500 italic">جاهز لاستقبال أوامرك الصوتية...</div>
             </div>
         </section>
 
     </main>
 
-    <!-- Audio Player for Real Human Gemini TTS -->
-    <audio id="ttsAudio" class="hidden" playsinline></audio>
-
     <script>
-        const apiKey = ""; // Runtime key
+        // Built-in Curated Audio/Video Streams for Instant Guaranteed Playback inside GitHub Pages
+        const QURAN_SURAHS = [
+            { name: 'سورة الفاتحة والبقرة - عبد الباسط عبد الصمد', url: 'https://server7.mp3quran.net/basit/001.mp3', fullUrl: 'https://server7.mp3quran.net/basit/002.mp3' },
+            { name: 'سورة الكهف - ماهر المعيقلي', url: 'https://server12.mp3quran.net/maher/018.mp3' },
+            { name: 'سورة يس - مشاري العفاسي', url: 'https://server8.mp3quran.net/afs/036.mp3' },
+            { name: 'سورة الرحمن - ياسر الدوسري', url: 'https://server11.mp3quran.net/yasser/055.mp3' }
+        ];
 
-        // Comprehensive App Registry with Real Deep Links & Web Fallbacks
-        const APPS_DB = [
+        // Internal Embedded Apps Database (All open INSIDE the platform!)
+        const INTERNAL_APPS = [
             {
                 id: 'youtube',
-                name: 'يوتيوب',
-                keywords: ['يوتيوب', 'فيديو', 'قران', 'مقطع', 'اغاني', 'محاضره', 'شرح'],
+                name: 'يوتيوب الداخلي',
+                keywords: ['يوتيوب', 'فيديو', 'مقطع', 'شرح', 'محاضره', 'اغاني'],
                 icon: 'fa-brands fa-youtube',
+                iconColor: 'text-red-500',
                 color: 'from-red-600 to-rose-500',
-                desc: 'بحث وتشغيل مباشر',
-                buildUrl: (query) => query 
-                    ? `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`
-                    : `https://www.youtube.com`
+                desc: 'مشغل فيديو مدمج بالمنصة'
             },
             {
-                id: 'whatsapp',
-                name: 'واتساب',
-                keywords: ['واتساب', 'واتس', 'مراسله'],
-                icon: 'fa-brands fa-whatsapp',
-                color: 'from-emerald-600 to-green-500',
-                desc: 'فتح المحادثات والرسائل',
-                buildUrl: (query) => query 
-                    ? `https://wa.me/?text=${encodeURIComponent(query)}`
-                    : `https://wa.me/`
+                id: 'quran',
+                name: 'القرآن الصوتي',
+                keywords: ['قران', 'سوره', 'تلاوه', 'البقره', 'الكهف', 'يس', 'الرحمن'],
+                icon: 'fa-solid fa-book-quran',
+                iconColor: 'text-emerald-400',
+                color: 'from-emerald-600 to-teal-500',
+                desc: 'تلاوات صوتية مباشرة'
             },
             {
-                id: 'telegram',
-                name: 'تيليجرام',
-                keywords: ['تيليجرام', 'تليكرام', 'تلغرام', 'تلي'],
-                icon: 'fa-brands fa-telegram',
-                color: 'from-sky-500 to-blue-500',
-                desc: 'فتح القنوات والرسائل',
-                buildUrl: () => `https://t.me/`
-            },
-            {
-                id: 'google',
-                name: 'بحث جوجل',
-                keywords: ['جوجل', 'كوكل', 'ابحث', 'بحث', 'معلومات'],
-                icon: 'fa-brands fa-google',
+                id: 'search',
+                name: 'الموسوعة والبحث',
+                keywords: ['جوجل', 'كوكل', 'ابحث', 'بحث', 'معلومات', 'شنو هو', 'من هو', 'ويكيبيديا'],
+                icon: 'fa-solid fa-magnifying-glass',
+                iconColor: 'text-sky-400',
                 color: 'from-blue-600 to-indigo-500',
-                desc: 'بحث صوتي ذكي في الويب',
-                buildUrl: (query) => query 
-                    ? `https://www.google.com/search?q=${encodeURIComponent(query)}`
-                    : `https://www.google.com`
+                desc: 'يجلب المعلومة ويقرأها صوتياً'
             },
             {
                 id: 'maps',
-                name: 'خرائط جوجل',
-                keywords: ['خرائط', 'خريطه', 'طريق', 'موقع', 'مكاني'],
+                name: 'الخرائط المدمجة',
+                keywords: ['خرائط', 'خريطه', 'موقع', 'مكان', 'كركوك', 'موصل', 'بغداد', 'طريق'],
                 icon: 'fa-solid fa-map-location-dot',
+                iconColor: 'text-amber-400',
                 color: 'from-amber-500 to-orange-500',
-                desc: 'تحديد الوجهات والأماكن',
-                buildUrl: (query) => query 
-                    ? `https://www.google.com/maps/search/${encodeURIComponent(query)}`
-                    : `https://maps.google.com`
+                desc: 'عرض الموقع داخل الشاشة'
             },
             {
-                id: 'instagram',
-                name: 'انستغرام',
-                keywords: ['انستغرام', 'انستكرام', 'انستا'],
-                icon: 'fa-brands fa-instagram',
-                color: 'from-fuchsia-600 to-pink-500',
-                desc: 'تصفح الحسابات والريلز',
-                buildUrl: () => `https://www.instagram.com`
+                id: 'calculator',
+                name: 'الحاسبة الصوتية',
+                keywords: ['حاسبه', 'احسب', 'جمع', 'ضرب', 'قسمه', 'ناقص', 'زائد', 'في'],
+                icon: 'fa-solid fa-calculator',
+                iconColor: 'text-purple-400',
+                color: 'from-purple-600 to-violet-500',
+                desc: 'حساب العمليات ونطق النتيجة'
             },
             {
-                id: 'facebook',
-                name: 'فيسبوك',
-                keywords: ['فيسبوك', 'فيس'],
-                icon: 'fa-brands fa-facebook',
-                color: 'from-blue-700 to-blue-600',
-                desc: 'فتح الصفحة الرئيسية',
-                buildUrl: () => `https://www.facebook.com`
+                id: 'notes',
+                name: 'المفكرة الصوتية',
+                keywords: ['مفكره', 'ملاحظه', 'سجل', 'اكتب', 'ذكرني'],
+                icon: 'fa-solid fa-note-sticky',
+                iconColor: 'text-yellow-400',
+                color: 'from-yellow-500 to-amber-500',
+                desc: 'حفظ وقراءة الملاحظات بالصوت'
             },
             {
-                id: 'phone',
-                name: 'الهاتف والاتصال',
-                keywords: ['اتصل', 'اتصال', 'مكالمه', 'خابر', 'رقم'],
-                icon: 'fa-solid fa-phone-volume',
-                color: 'from-teal-500 to-emerald-500',
-                desc: 'إجراء مكالمة هاتفية',
-                buildUrl: (query) => {
-                    const digits = (query || '').replace(/[^\d+]/g, '');
-                    return digits ? `tel:${digits}` : `tel:`;
-                }
+                id: 'time',
+                name: 'الوقت والتاريخ',
+                keywords: ['ساعه', 'وقت', 'تاريخ', 'اليوم', 'بش الساعه'],
+                icon: 'fa-solid fa-clock',
+                iconColor: 'text-cyan-400',
+                color: 'from-cyan-600 to-sky-500',
+                desc: 'نطق الوقت والتاريخ بدقة'
+            },
+            {
+                id: 'radio',
+                name: 'إذاعة الأخبار',
+                keywords: ['راديو', 'اذاعه', 'اخبار', 'بث'],
+                icon: 'fa-solid fa-radio',
+                iconColor: 'text-pink-400',
+                color: 'from-pink-600 to-rose-500',
+                desc: 'بث صوتي مباشر داخل المنصة'
             }
         ];
 
@@ -235,11 +241,13 @@
         let isStarting = false;
         let isSpeaking = false;
         let isProcessing = false;
+        let activeAppId = null;
         let recognition = null;
         let restartTimeout = null;
         let micSupported = true;
+        let savedNotes = JSON.parse(localStorage.getItem('sada_notes') || '["موعد مسابقة المواهب في الجامعة التقنية الشمالية يوم الأحد"]');
 
-        // DOM Elements
+        // DOM References
         const micOrb = document.getElementById('micOrb');
         const micIcon = document.getElementById('micIcon');
         const micLabel = document.getElementById('micLabel');
@@ -248,14 +256,18 @@
         const userTranscript = document.getElementById('userTranscript');
         const assistantReply = document.getElementById('assistantReply');
         const actionLog = document.getElementById('actionLog');
-        const ttsAudio = document.getElementById('ttsAudio');
+        const embeddedWorkspace = document.getElementById('embeddedWorkspace');
+        const workspaceBody = document.getElementById('workspaceBody');
+        const workspaceTitle = document.getElementById('workspaceTitle');
+        const workspaceIcon = document.getElementById('workspaceIcon');
+        const homeReturnBtn = document.getElementById('homeReturnBtn');
 
-        // Render Apps Grid on Load
+        // Render Apps Grid
         function renderAppsGrid() {
             const grid = document.getElementById('appsGrid');
-            grid.innerHTML = APPS_DB.map(app => `
-                <button onclick="executeAppLaunch('${app.id}', '')" class="bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-sky-500/40 rounded-2xl p-3.5 flex flex-col items-center text-center transition-all group">
-                    <div class="w-11 h-11 rounded-xl bg-gradient-to-tr ${app.color} text-white flex items-center justify-center text-xl mb-2 shadow-md group-hover:scale-110 transition-transform">
+            grid.innerHTML = INTERNAL_APPS.map(app => `
+                <button onclick="openInternalApp('${app.id}', '')" class="bg-slate-900/85 hover:bg-slate-800 border border-slate-800 hover:border-sky-500/40 rounded-2xl p-3 flex flex-col items-center text-center transition-all group">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr ${app.color} text-white flex items-center justify-center text-lg mb-1.5 shadow-md group-hover:scale-110 transition-transform">
                         <i class="${app.icon}"></i>
                     </div>
                     <span class="text-xs font-black text-white">${app.name}</span>
@@ -269,44 +281,44 @@
             micOrb.classList.remove('pulse-ring', 'speaking-ring');
             if (state === 'listening') {
                 micOrb.classList.add('pulse-ring');
-                micIcon.className = 'fa-solid fa-microphone-lines text-4xl mb-1';
+                micIcon.className = 'fa-solid fa-microphone-lines text-3xl sm:text-4xl mb-1';
                 micLabel.textContent = 'أسمعك الآن...';
                 statusText.textContent = 'يستمع لأوامرك';
                 statusDot.className = 'w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping';
             } else if (state === 'speaking') {
                 micOrb.classList.add('speaking-ring');
-                micIcon.className = 'fa-solid fa-volume-high text-4xl mb-1';
-                micLabel.textContent = 'يتحدث الآن...';
-                statusText.textContent = 'صوت المساعد';
+                micIcon.className = 'fa-solid fa-volume-high text-3xl sm:text-4xl mb-1';
+                micLabel.textContent = 'يتحدث...';
+                statusText.textContent = 'ينطق الآن';
                 statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
             } else if (state === 'thinking') {
-                micIcon.className = 'fa-solid fa-spinner fa-spin text-4xl mb-1';
-                micLabel.textContent = 'جاري التنفيذ...';
-                statusText.textContent = 'يعالج الأمر';
+                micIcon.className = 'fa-solid fa-spinner fa-spin text-3xl sm:text-4xl mb-1';
+                micLabel.textContent = 'جاري الفتح...';
+                statusText.textContent = 'ينفذ الأمر';
                 statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
             } else {
-                micIcon.className = 'fa-solid fa-microphone text-4xl mb-1';
+                micIcon.className = 'fa-solid fa-microphone text-3xl sm:text-4xl mb-1';
                 micLabel.textContent = 'اضغط للتحدث';
                 statusText.textContent = 'جاهز';
                 statusDot.className = 'w-2.5 h-2.5 rounded-full bg-sky-400';
             }
         }
 
-        // Unlock Audio & Mic on First User Tap
+        // Preload Arabic voices in browser immediately
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.getVoices();
+            window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+        }
+
         async function activateVoiceEngine() {
-            // Unlock Web Audio Context immediately on user gesture
-            try {
-                const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                if (AudioCtx) {
-                    const ctx = new AudioCtx();
-                    if (ctx.state === 'suspended') await ctx.resume();
-                }
-            } catch (e) {}
+            // Pause any active internal audio/media while user speaks
+            const activeMedia = workspaceBody.querySelector('audio');
+            if (activeMedia && !activeMedia.paused) activeMedia.pause();
 
             if (!isActivated) {
                 isActivated = true;
                 setupRecognition();
-                await speakOut("أهلاً بك في نظام صدى. أنا جاهز لفتح وإدارة أي تطبيق على جهازك، تفضل قل اسم التطبيق.");
+                await speakInstant("أهلاً بك في نظام صدى. كل التطبيقات تفتح هنا داخل المنصة. قل مثلاً: شغل قرآن، افتح يوتيوب، افتح الخرائط، أو ابحث في الموسوعة.");
                 return;
             }
 
@@ -348,7 +360,7 @@
                 if (final && final.trim()) {
                     const cmd = final.trim();
                     userTranscript.textContent = `"${cmd}"`;
-                    processVoiceCommand(cmd);
+                    processCommand(cmd);
                 }
             };
 
@@ -357,17 +369,17 @@
                 isListening = false;
                 if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
                     micSupported = false;
-                    statusText.textContent = 'المايك محظور بالمعاينة - اكتب أمرك';
+                    statusText.textContent = 'المايك محظور - اكتب أمرك';
                     setUIState('idle');
                     return;
                 }
-                scheduleRestart(500);
+                scheduleRestart(450);
             };
 
             recognition.onend = () => {
                 isStarting = false;
                 isListening = false;
-                scheduleRestart(400);
+                scheduleRestart(350);
             };
         }
 
@@ -408,13 +420,13 @@
             input.value = '';
             isActivated = true;
             userTranscript.textContent = `"${val}"`;
-            processVoiceCommand(val);
+            processCommand(val);
         }
 
         /**
-         * Intelligent Command Router: Understands Iraqi & Standard Arabic
+         * Processes Iraqi & Standard Arabic Commands and Executes Inside Platform
          */
-        async function processVoiceCommand(rawText) {
+        async function processCommand(rawText) {
             if (isProcessing) return;
             isProcessing = true;
             stopListeningSafe();
@@ -422,83 +434,273 @@
 
             const clean = rawText.replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').toLowerCase();
 
-            // 1. Direct Fast Matching for Apps (Instant Response)
-            for (const app of APPS_DB) {
+            // 1. Navigation / Close Commands inside Platform
+            if (clean.includes('اغلق') || clean.includes('سد') || clean.includes('رجوع') || clean.includes('الرئيسيه') || clean.includes('اطلع')) {
+                isProcessing = false;
+                if (activeAppId) {
+                    closeEmbeddedApp();
+                    await speakInstant("تم إغلاق التطبيق والعودة للشاشة الرئيسية.");
+                } else {
+                    await speakInstant("أنت الآن في الشاشة الرئيسية للمنصة.");
+                }
+                return;
+            }
+
+            // 2. Media Playback Controls when Quran/Radio is open
+            if (clean.includes('وقف') || clean.includes('ايقاف') || clean.includes('اسكت')) {
+                const audioEl = workspaceBody.querySelector('audio');
+                if (audioEl) audioEl.pause();
+                isProcessing = false;
+                await speakInstant("تم إيقاف التشغيل مؤقتاً.");
+                return;
+            }
+            if (clean.includes('كمل') || clean.includes('استمر')) {
+                const audioEl = workspaceBody.querySelector('audio');
+                if (audioEl) audioEl.play();
+                isProcessing = false;
+                await speakInstant("تم استئناف التشغيل.");
+                return;
+            }
+
+            // 3. Time & Date
+            if (clean.includes('ساعه') || clean.includes('وقت') || clean.includes('تاريخ') || clean.includes('اليوم')) {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
+                const dateStr = now.toLocaleDateString('ar-IQ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                isProcessing = false;
+                await openInternalApp('time', `${timeStr} - ${dateStr}`);
+                return;
+            }
+
+            // 4. Math / Calculator
+            if (clean.includes('احسب') || clean.includes('حاسبه') || /[\d]+\s*(زائد|ناقص|في|تقسيم|\+|\-|\*|\/)\s*[\d]+/.test(clean)) {
+                isProcessing = false;
+                await openInternalApp('calculator', rawText);
+                return;
+            }
+
+            // 5. Match Internal App
+            for (const app of INTERNAL_APPS) {
                 if (app.keywords.some(kw => clean.includes(kw))) {
-                    // Extract search query or phone number after the app/action keyword
-                    let extractedQuery = rawText
-                        .replace(/افتح|شغل|ادخل|ساعدني|اريد|على|في|تطبيق|برنامج|يوتيوب|واتساب|تيليجرام|تليكرام|جوجل|كوكل|ابحث|عن|لي|خرائط|انستغرام|فيسبوك|اتصل|بـ|على/gi, '')
+                    const query = rawText
+                        .replace(/افتح|شغل|ادخل|ساعدني|اريد|على|في|تطبيق|برنامج|يوتيوب|ابحث|عن|لي|خرائط|موسوعه|جوجل|كوكل|مفكره|سجل|اكتب/gi, '')
                         .trim();
-
-                    // Special case: if user just said "شغل قرآن" without saying "يوتيوب", keep "قرآن" as query
-                    if (app.id === 'youtube' && clean.includes('قران') && !extractedQuery.includes('قرآن') && !extractedQuery.includes('قران')) {
-                        extractedQuery = 'قرآن كريم';
-                    }
-
                     isProcessing = false;
-                    await executeAppLaunch(app.id, extractedQuery);
+                    await openInternalApp(app.id, query);
                     return;
                 }
             }
 
-            // 2. Fallback to Gemini AI to understand complex requests or general conversation
-            try {
-                const aiResponse = await askGeminiRouter(rawText);
-                isProcessing = false;
+            // 6. Default: Search inside Built-in Encyclopedia & Read Result Aloud
+            isProcessing = false;
+            await openInternalApp('search', rawText);
+        }
 
-                if (aiResponse.appId && APPS_DB.some(a => a.id === aiResponse.appId)) {
-                    await executeAppLaunch(aiResponse.appId, aiResponse.query || '');
-                } else {
-                    addLog(`محادثة: ${rawText}`);
-                    await speakOut(aiResponse.reply || "سمعتك بوضوح، قل اسم التطبيق الذي تريد فتحه مثل يوتيوب أو واتساب.");
+        /**
+         * Opens the Requested App INSIDE the Platform Workspace (Zero External Redirects!)
+         */
+        async function openInternalApp(appId, query) {
+            const app = INTERNAL_APPS.find(a => a.id === appId);
+            if (!app) return;
+
+            activeAppId = appId;
+            embeddedWorkspace.classList.remove('hidden');
+            homeReturnBtn.classList.remove('hidden');
+            workspaceIcon.className = `${app.icon} text-xl ${app.iconColor}`;
+            workspaceTitle.textContent = query ? `${app.name} - ${query}` : app.name;
+
+            addLog(`فتح داخل المنصة: ${app.name}${query ? ` (${query})` : ''}`);
+
+            // A. EMBEDDED YOUTUBE PLAYER (Plays inside the page via official no-cookie embed)
+            if (appId === 'youtube') {
+                const searchTerm = query || 'قرآن كريم تلاوة خاشعة';
+                workspaceBody.innerHTML = `
+                    <div class="w-full flex flex-col">
+                        <div class="w-full aspect-video bg-black">
+                            <iframe class="w-full h-full"
+                                src="https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(searchTerm)}&autoplay=1"
+                                title="مشغل يوتيوب الداخلي"
+                                frameborder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowfullscreen>
+                            </iframe>
+                        </div>
+                        <div class="p-3 bg-slate-950 flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <span class="text-slate-300 font-bold">يعرض الآن داخل المنصة: <span class="text-sky-400">${searchTerm}</span></span>
+                            <button onclick="openInternalApp('quran', '${searchTerm}')" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold">
+                                تشغيل صوتي مباشر بديل
+                            </button>
+                        </div>
+                    </div>
+                `;
+                await speakInstant(`تم فتح يوتيوب داخل المنصة وتشغيل ${searchTerm}.`);
+                return;
+            }
+
+            // B. EMBEDDED QURAN AUDIO PLAYER (Guaranteed Instant Audio Playback inside Platform)
+            if (appId === 'quran') {
+                let selected = QURAN_SURAHS[0];
+                if (query.includes('كهف')) selected = QURAN_SURAHS[1];
+                else if (query.includes('يس')) selected = QURAN_SURAHS[2];
+                else if (query.includes('رحمن')) selected = QURAN_SURAHS[3];
+                else if (query.includes('بقره')) selected = { name: 'سورة البقرة كاملة - عبد الباسط', url: QURAN_SURAHS[0].fullUrl };
+
+                workspaceBody.innerHTML = `
+                    <div class="w-full p-6 flex flex-col items-center text-center bg-gradient-to-b from-emerald-950/60 to-slate-950 gap-4">
+                        <div class="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-3xl text-emerald-400">
+                            <i class="fa-solid fa-book-quran"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base sm:text-lg font-black text-white">${selected.name}</h3>
+                            <p class="text-xs text-emerald-300 mt-1">يعمل الآن داخل المنصة • قل "وقف" أو "كمل" أو "رجوع"</p>
+                        </div>
+                        <audio id="internalQuranAudio" controls autoplay class="w-full max-w-md rounded-xl">
+                            <source src="${selected.url}" type="audio/mpeg">
+                        </audio>
+                        <div class="flex flex-wrap justify-center gap-2 mt-1">
+                            ${QURAN_SURAHS.map(s => `
+                                <button onclick="openInternalApp('quran', '${s.name}')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-700 text-xs font-bold text-white transition-all">
+                                    ${s.name.split('-')[0]}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                await speakInstant(`جاري تشغيل ${selected.name} داخل المنصة الآن.`);
+                const audioEl = document.getElementById('internalQuranAudio');
+                if (audioEl) audioEl.play().catch(() => {});
+                return;
+            }
+
+            // C. EMBEDDED ENCYCLOPEDIA & VOICE READER (Fetches real Arabic summary & reads aloud)
+            if (appId === 'search') {
+                const topic = query || 'الذكاء الاصطناعي';
+                workspaceBody.innerHTML = `
+                    <div class="w-full p-6 flex flex-col gap-3 bg-slate-950 text-right">
+                        <div class="flex items-center gap-2 text-sky-400 text-xs font-black">
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                            <span>جاري البحث في الموسوعة العربية عن: ${topic}...</span>
+                        </div>
+                    </div>
+                `;
+                try {
+                    const res = await fetch(`https://ar.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`);
+                    const data = await res.json();
+                    const extract = data.extract || `لم أجد مقالاً مباشراً بعنوان "${topic}" في الموسوعة، جرب البحث بكلمة أوضح مثل: العراق، الموصل، كركوك، أو الذكاء الاصطناعي.`;
+                    workspaceBody.innerHTML = `
+                        <div class="w-full p-5 sm:p-6 flex flex-col gap-3 bg-slate-950 text-right">
+                            <h3 class="text-base sm:text-lg font-black text-sky-400">${data.title || topic}</h3>
+                            <p class="text-sm text-slate-200 leading-relaxed max-h-48 overflow-y-auto">${extract}</p>
+                        </div>
+                    `;
+                    // Read first 2 sentences aloud clearly
+                    const shortSummary = extract.split('.').slice(0, 2).join('.');
+                    await speakInstant(shortSummary);
+                } catch (e) {
+                    workspaceBody.innerHTML = `<div class="p-6 text-sm text-slate-300">تعذر جلب النتيجة حالياً، تأكد من اتصال الإنترنت.</div>`;
+                    await speakInstant("تعذر جلب المعلومة حالياً بسبب ضعف الإنترنت.");
                 }
-            } catch (err) {
-                isProcessing = false;
-                await speakOut("تفضل، قل اسم التطبيق مثل يوتيوب، واتساب، تيليجرام، أو جوجل وسأفتحه فوراً.");
+                return;
+            }
+
+            // D. EMBEDDED INTERACTIVE MAP (Opens inside platform without leaving)
+            if (appId === 'maps') {
+                const place = query || 'الجامعة التقنية الشمالية الموصل';
+                workspaceBody.innerHTML = `
+                    <div class="w-full flex flex-col">
+                        <iframe class="w-full h-72 sm:h-80 border-0"
+                            src="https://maps.google.com/maps?q=${encodeURIComponent(place)}&t=&z=14&ie=UTF8&iwloc=&output=embed">
+                        </iframe>
+                        <div class="p-3 bg-slate-950 text-xs text-amber-300 font-bold text-center">
+                            الخريطة مفتوحة داخل المنصة لموقع: ${place}
+                        </div>
+                    </div>
+                `;
+                await speakInstant(`تم فتح الخريطة داخل المنصة وتحديد موقع ${place}.`);
+                return;
+            }
+
+            // E. VOICE CALCULATOR INSIDE PLATFORM
+            if (appId === 'calculator') {
+                let expr = query
+                    .replace(/زائد/g, '+')
+                    .replace(/ناقص/g, '-')
+                    .replace(/في|ضرب/g, '*')
+                    .replace(/تقسيم|على/g, '/')
+                    .replace(/[^\d+\-*/.]/g, '');
+
+                let resultText = "قل العملية الحسابية مثل: احسب 25 في 4";
+                if (expr && /[\d]+[+\-*/][\d]+/.test(expr)) {
+                    try {
+                        const ans = Function('"use strict";return (' + expr + ')')();
+                        resultText = `${expr.replace('*', '×').replace('/', '÷')} = ${ans}`;
+                    } catch (e) {}
+                }
+
+                workspaceBody.innerHTML = `
+                    <div class="w-full p-8 flex flex-col items-center justify-center text-center bg-slate-950 gap-3">
+                        <i class="fa-solid fa-calculator text-4xl text-purple-400"></i>
+                        <div class="text-2xl sm:text-3xl font-black text-white tracking-wider" dir="ltr">${resultText}</div>
+                        <p class="text-xs text-slate-400">قل أي عملية حسابية أخرى وسأنطق نتيجتها فوراً</p>
+                    </div>
+                `;
+                await speakInstant(`النتيجة هي: ${resultText.replace('*', 'ضرب').replace('/', 'تقسيم')}`);
+                return;
+            }
+
+            // F. VOICE NOTES INSIDE PLATFORM
+            if (appId === 'notes') {
+                if (query && query.length > 2) {
+                    savedNotes.unshift(query);
+                    localStorage.setItem('sada_notes', JSON.stringify(savedNotes));
+                }
+                workspaceBody.innerHTML = `
+                    <div class="w-full p-5 flex flex-col gap-3 bg-slate-950 text-right">
+                        <h3 class="text-sm font-black text-yellow-400">ملاحظاتك المحفوظة داخل المنصة:</h3>
+                        <ul class="space-y-2 text-sm text-white">
+                            ${savedNotes.map((n, idx) => `<li class="p-2.5 rounded-xl bg-slate-900 border border-slate-800">${idx + 1}. ${n}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+                const reply = query && query.length > 2
+                    ? `تم حفظ ملاحظتك الجديدة: ${query}`
+                    : `لديك ${savedNotes.length} ملاحظات، آخرها: ${savedNotes[0]}`;
+                await speakInstant(reply);
+                return;
+            }
+
+            // G. TIME & DATE INSIDE PLATFORM
+            if (appId === 'time') {
+                workspaceBody.innerHTML = `
+                    <div class="w-full p-8 flex flex-col items-center justify-center text-center bg-slate-950 gap-2">
+                        <i class="fa-solid fa-clock text-4xl text-cyan-400 mb-1"></i>
+                        <div class="text-xl sm:text-2xl font-black text-white">${query}</div>
+                    </div>
+                `;
+                await speakInstant(`الوقت والتاريخ الآن هو ${query}`);
+                return;
+            }
+
+            // H. LIVE RADIO STREAM INSIDE PLATFORM
+            if (appId === 'radio') {
+                workspaceBody.innerHTML = `
+                    <div class="w-full p-6 flex flex-col items-center text-center bg-slate-950 gap-4">
+                        <i class="fa-solid fa-radio text-4xl text-pink-400"></i>
+                        <h3 class="text-base font-black text-white">إذاعة القرآن الكريم المباشرة</h3>
+                        <audio controls autoplay class="w-full max-w-md">
+                            <source src="https://stream.radiojar.com/8s5u5tpdtwzuv" type="audio/mpeg">
+                        </audio>
+                    </div>
+                `;
+                await speakInstant("تم تشغيل البث الإذاعي المباشر داخل المنصة.");
             }
         }
 
-        async function executeAppLaunch(appId, query) {
-            const app = APPS_DB.find(a => a.id === appId);
-            if (!app) return;
-
-            const targetUrl = app.buildUrl(query);
-            const message = query 
-                ? `حاضر، جاري فتح ${app.name} والبحث عن ${query} الآن.`
-                : `حاضر، جاري فتح تطبيق ${app.name} لك الآن.`;
-
-            // Show real interactive launch banner & trigger real anchor click
-            const banner = document.getElementById('launchBanner');
-            const bannerTitle = document.getElementById('launchBannerTitle');
-            const bannerSub = document.getElementById('launchBannerSub');
-            const bannerIcon = document.getElementById('launchBannerIcon');
-            const directLink = document.getElementById('directLaunchLink');
-
-            bannerIcon.className = `${app.icon} text-3xl text-white`;
-            bannerTitle.textContent = query ? `${app.name}: ${query}` : `تطبيق ${app.name}`;
-            bannerSub.textContent = targetUrl;
-            directLink.href = targetUrl;
-            if (targetUrl.startsWith('tel:')) {
-                directLink.removeAttribute('target');
-            } else {
-                directLink.setAttribute('target', '_blank');
-            }
-            banner.classList.remove('hidden');
-
-            addLog(`فتح ${app.name}${query ? ` (${query})` : ''}`);
-
-            // Trigger real navigation immediately before async audio blocks gesture
-            try {
-                if (targetUrl.startsWith('tel:')) {
-                    window.top.location.href = targetUrl;
-                } else {
-                    directLink.click();
-                }
-            } catch (e) {
-                window.open(targetUrl, '_blank');
-            }
-
-            await speakOut(message);
+        function closeEmbeddedApp() {
+            activeAppId = null;
+            workspaceBody.innerHTML = '';
+            embeddedWorkspace.classList.add('hidden');
+            homeReturnBtn.classList.add('hidden');
         }
 
         function addLog(text) {
@@ -511,155 +713,56 @@
         }
 
         /**
-         * Uses Gemini 3 Flash Preview to parse complex Iraqi commands into JSON action
+         * Instant Guaranteed Local Voice Synthesizer (Works 100% on GitHub Pages without external API failures)
          */
-        async function askGeminiRouter(userText) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{
-                            text: `أنت نظام تشغيل صوتي ذكي اسمه "صدى" لإدارة تطبيقات الهاتف باللهجة العراقية والعربية.
-حلل طلب المستخدم: "${userText}"
-أعد النتيجة بصيغة JSON فقط بهذا الشكل:
-{"appId": "youtube|whatsapp|telegram|google|maps|instagram|facebook|phone|none", "query": "نص البحث أو الرقم إن وجد", "reply": "رد بشري دافئ ومختصر باللهجة العراقية أو العربية"}`
-                        }]
-                    }],
-                    generationConfig: { responseMimeType: "application/json" }
-                })
-            });
-            const data = await response.json();
-            const rawJson = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-            return JSON.parse(rawJson);
-        }
-
-        /**
-         * Dual-Engine Voice Output:
-         * 1. Tries Real Human Voice (Gemini TTS) first with exact sampleRate parsing.
-         * 2. Instantly falls back to guaranteed Browser SpeechSynthesis if blocked/offline.
-         */
-        async function speakOut(text) {
-            stopSpeaking();
-            stopListeningSafe();
-            isSpeaking = true;
-            assistantReply.textContent = text;
-            setUIState('speaking');
-
-            let playedSuccessfully = false;
-
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-                const ttsUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
-                const res = await fetch(ttsUrl, {
-                    method: 'POST',
-                    signal: controller.signal,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: text }] }],
-                        generationConfig: {
-                            responseModalities: ["AUDIO"],
-                            speechConfig: {
-                                voiceConfig: {
-                                    prebuiltVoiceConfig: { voiceName: "Sulafat" }
-                                }
-                            }
-                        },
-                        model: "gemini-2.5-flash-preview-tts"
-                    })
-                });
-                clearTimeout(timeoutId);
-
-                const data = await res.json();
-                const inlineData = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-
-                if (inlineData && inlineData.data) {
-                    const rateMatch = (inlineData.mimeType || '').match(/rate=(\d+)/);
-                    const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
-                    const wavBlob = pcmToWavBlob(inlineData.data, sampleRate);
-                    const blobUrl = URL.createObjectURL(wavBlob);
-                    playedSuccessfully = await playHtmlAudio(blobUrl);
-                    URL.revokeObjectURL(blobUrl);
-                }
-            } catch (e) {
-                playedSuccessfully = false;
-            }
-
-            if (!playedSuccessfully) {
-                await playBrowserTTS(text);
-            }
-
-            isSpeaking = false;
-            if (isActivated && micSupported) {
-                startListeningSafe();
-            } else {
-                setUIState('idle');
-            }
-        }
-
-        function playHtmlAudio(url) {
+        function speakInstant(text) {
             return new Promise((resolve) => {
-                ttsAudio.src = url;
-                ttsAudio.onended = () => resolve(true);
-                ttsAudio.onerror = () => resolve(false);
-                const playPromise = ttsAudio.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(() => resolve(false));
-                }
-            });
-        }
+                stopSpeaking();
+                stopListeningSafe();
+                isSpeaking = true;
+                assistantReply.textContent = text;
+                setUIState('speaking');
 
-        function playBrowserTTS(text) {
-            return new Promise((resolve) => {
                 if (!('speechSynthesis' in window)) {
+                    isSpeaking = false;
+                    setUIState('idle');
                     resolve();
                     return;
                 }
+
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
+                const voices = window.speechSynthesis.getVoices();
+                const arabicVoice = voices.find(v => v.lang.includes('ar'));
+                if (arabicVoice) utterance.voice = arabicVoice;
                 utterance.lang = 'ar-SA';
-                utterance.rate = 1.0;
-                // Safety timeout in case mobile browser hangs on onend
-                const safetyTimer = setTimeout(() => resolve(), Math.max(2500, text.length * 85));
-                utterance.onend = () => { clearTimeout(safetyTimer); resolve(); };
-                utterance.onerror = () => { clearTimeout(safetyTimer); resolve(); };
+                utterance.rate = 1.02;
+                utterance.pitch = 1.0;
+
+                const fallbackTimer = setTimeout(() => {
+                    finishSpeech();
+                }, Math.max(2500, text.length * 90));
+
+                function finishSpeech() {
+                    clearTimeout(fallbackTimer);
+                    isSpeaking = false;
+                    if (isActivated && micSupported) {
+                        startListeningSafe();
+                    } else {
+                        setUIState('idle');
+                    }
+                    resolve();
+                }
+
+                utterance.onend = finishSpeech;
+                utterance.onerror = finishSpeech;
                 window.speechSynthesis.speak(utterance);
             });
         }
 
         function stopSpeaking() {
-            ttsAudio.pause();
-            ttsAudio.currentTime = 0;
             if ('speechSynthesis' in window) window.speechSynthesis.cancel();
             isSpeaking = false;
-        }
-
-        function pcmToWavBlob(base64Pcm, sampleRate) {
-            const bin = atob(base64Pcm);
-            const len = bin.length;
-            const buf = new ArrayBuffer(44 + len);
-            const view = new DataView(buf);
-            const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
-
-            writeStr(0, 'RIFF');
-            view.setUint32(4, 36 + len, true);
-            writeStr(8, 'WAVE');
-            writeStr(12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true);
-            view.setUint16(22, 1, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, sampleRate * 2, true);
-            view.setUint16(32, 2, true);
-            view.setUint16(34, 16, true);
-            writeStr(36, 'data');
-            view.setUint32(40, len, true);
-
-            for (let i = 0; i < len; i++) view.setUint8(44 + i, bin.charCodeAt(i));
-            return new Blob([buf], { type: 'audio/wav' });
         }
     </script>
 </body>
