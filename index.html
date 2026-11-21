@@ -23,6 +23,9 @@
             ntu: {
               50: '#f0fdfa',
               100: '#ccfbf1',
+              200: '#99f6e4',
+              300: '#5eead4',
+              400: '#2dd4bf',
               500: '#14b8a6',
               600: '#0d9488',
               700: '#0f766e',
@@ -48,14 +51,20 @@
   <!-- Firebase SDK 11.1.0 Modules -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+    import { 
+      getAuth, signInAnonymously, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
+      signOut, onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
     import { 
       getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, 
-      onSnapshot, query, where, serverTimestamp 
+      onSnapshot, query, where, serverTimestamp, writeBatch 
     } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
     import { 
       getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject 
     } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-storage.js";
+    import { 
+      getFunctions, httpsCallable 
+    } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-functions.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBZfsS5xjUyunwIt_cHaPWHQI3H_lzYXoo",
@@ -70,14 +79,21 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
     const storage = getStorage(app);
+    const functions = getFunctions(app);
+
+    // ضبط مهلة المحاولات لتجنب التعليق الطويل عند انقطاع الاتصال أو الصلاحيات
+    storage.maxUploadRetryTime = 30000;
+    storage.maxOperationRetryTime = 30000;
 
     // تصدير أدوات Firebase للواجهة
     window.fb = {
-      auth, db, storage,
-      signInAnonymously, onAuthStateChanged,
+      auth, db, storage, functions,
+      signInAnonymously, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+      signOut, onAuthStateChanged,
       collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
-      onSnapshot, query, where, serverTimestamp,
-      ref, uploadBytesResumable, getDownloadURL, deleteObject
+      onSnapshot, query, where, serverTimestamp, writeBatch,
+      ref, uploadBytesResumable, getDownloadURL, deleteObject,
+      httpsCallable
     };
     window.dispatchEvent(new Event('firebase-ready'));
   </script>
@@ -108,8 +124,95 @@
     const { useState, useEffect, useMemo, useRef } = React;
 
     // ==========================================
-    // 1. الثوابت والدوال المساعدة (Helpers & Crypto)
+    // 1. الثوابت والدوال المساعدة (Helpers & Constants)
     // ==========================================
+    // القائمة الافتراضية للأقسام الرسمية (يمكنك إضافة أي قسم جديد هنا أو من Firestore -> config/departments)
+    const DEFAULT_DEPARTMENTS = [
+      "قسم المختبرات الطبية – الكلية الصحية والطبية"
+    ];
+
+    // شعار جامعة التقنية الشمالية المضمّن بصيغة Data URI
+    const NTU_DEFAULT_LOGO = "data:image/svg+xml;utf8," + encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+        <defs>
+          <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
+            <stop offset="0%" stop-color="#f8fafc"/>
+            <stop offset="100%" stop-color="#e2e8f0"/>
+          </radialGradient>
+        </defs>
+        <rect width="500" height="500" fill="url(#bgGrad)"/>
+        <circle cx="250" cy="250" r="212" fill="#063159" stroke="#0d1b2a" stroke-width="14"/>
+        <path d="M132 340 L132 162 L250 75 L368 162 L368 340" fill="none" stroke="#eab308" stroke-width="5" stroke-linejoin="round"/>
+        <line x1="132" y1="365" x2="368" y2="365" stroke="#eab308" stroke-width="4"/>
+        <line x1="132" y1="365" x2="132" y2="340" stroke="#eab308" stroke-width="4"/>
+        <line x1="368" y1="365" x2="368" y2="340" stroke="#eab308" stroke-width="4"/>
+        <polygon points="250,92 254,104 267,104 256,111 260,123 250,116 240,123 244,111 233,104 246,104" fill="#eab308"/>
+        <text x="250" y="142" text-anchor="middle" fill="#eab308" font-family="Arial, sans-serif" font-weight="bold" font-size="22" letter-spacing="2">IRAQ</text>
+        <g fill="#eab308">
+          <ellipse cx="144" cy="270" rx="4" ry="9" transform="rotate(-35 144 270)"/>
+          <ellipse cx="144" cy="250" rx="4" ry="9" transform="rotate(-35 144 250)"/>
+          <ellipse cx="144" cy="230" rx="4" ry="9" transform="rotate(-35 144 230)"/>
+          <ellipse cx="144" cy="210" rx="4" ry="9" transform="rotate(-35 144 210)"/>
+          <ellipse cx="144" cy="190" rx="4" ry="9" transform="rotate(-35 144 190)"/>
+          <ellipse cx="152" cy="168" rx="4" ry="9" transform="rotate(-10 152 168)"/>
+          <ellipse cx="168" cy="154" rx="4" ry="9" transform="rotate(15 168 154)"/>
+          <ellipse cx="185" cy="140" rx="4" ry="9" transform="rotate(15 185 140)"/>
+          <ellipse cx="202" cy="126" rx="4" ry="9" transform="rotate(15 202 126)"/>
+          <ellipse cx="220" cy="113" rx="4" ry="9" transform="rotate(15 220 113)"/>
+          <ellipse cx="356" cy="270" rx="4" ry="9" transform="rotate(35 356 270)"/>
+          <ellipse cx="356" cy="250" rx="4" ry="9" transform="rotate(35 356 250)"/>
+          <ellipse cx="356" cy="230" rx="4" ry="9" transform="rotate(35 356 230)"/>
+          <ellipse cx="356" cy="210" rx="4" ry="9" transform="rotate(35 356 210)"/>
+          <ellipse cx="356" cy="190" rx="4" ry="9" transform="rotate(35 356 190)"/>
+          <ellipse cx="348" cy="168" rx="4" ry="9" transform="rotate(10 348 168)"/>
+          <ellipse cx="332" cy="154" rx="4" ry="9" transform="rotate(-15 332 154)"/>
+          <ellipse cx="315" cy="140" rx="4" ry="9" transform="rotate(-15 315 140)"/>
+          <ellipse cx="298" cy="126" rx="4" ry="9" transform="rotate(-15 298 126)"/>
+          <ellipse cx="280" cy="113" rx="4" ry="9" transform="rotate(-15 280 113)"/>
+        </g>
+        <path d="M240 168 A12 12 0 0 1 260 168" fill="none" stroke="#ffffff" stroke-width="3"/>
+        <line x1="250" y1="148" x2="250" y2="155" stroke="#ffffff" stroke-width="2.5"/>
+        <line x1="237" y1="152" x2="241" y2="158" stroke="#ffffff" stroke-width="2.5"/>
+        <line x1="263" y1="152" x2="259" y2="158" stroke="#ffffff" stroke-width="2.5"/>
+        <line x1="230" y1="162" x2="236" y2="165" stroke="#ffffff" stroke-width="2.5"/>
+        <line x1="270" y1="162" x2="264" y2="165" stroke="#ffffff" stroke-width="2.5"/>
+        <polygon points="241,171 259,171 253,179 253,222 247,222 247,179" fill="#ffffff"/>
+        <path d="M244 222 L198 232 L182 182 L244 176 Z" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round"/>
+        <path d="M182 186 L172 190 L190 236 L244 226" fill="none" stroke="#ffffff" stroke-width="2.5"/>
+        <path d="M256 222 L302 232 L318 182 L256 176 Z" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round"/>
+        <path d="M318 186 L328 190 L310 236 L256 226" fill="none" stroke="#ffffff" stroke-width="2.5"/>
+        <text x="216" y="211" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-weight="bold" font-size="28">N</text>
+        <text x="284" y="211" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-weight="bold" font-size="28">U</text>
+        <path d="M225 256 A26 26 0 0 1 275 256" fill="none" stroke="#ffffff" stroke-width="4" stroke-dasharray="6,4"/>
+        <path d="M233 256 A17 17 0 0 1 267 256" fill="none" stroke="#ffffff" stroke-width="3"/>
+        <path d="M182 256 L195 256 L195 262 L212 262 L212 256 L228 256 L228 262 L272 262 L272 256 L288 256 L288 262 L305 262 L305 256 L318 256 L318 302 L182 302 Z" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round"/>
+        <line x1="224" y1="262" x2="224" y2="302" stroke="#ffffff" stroke-width="3"/>
+        <line x1="276" y1="262" x2="276" y2="302" stroke="#ffffff" stroke-width="3"/>
+        <rect x="190" y="286" width="5" height="12" fill="#ffffff"/>
+        <rect x="198" y="280" width="5" height="18" fill="#ffffff"/>
+        <rect x="206" y="274" width="5" height="24" fill="#ffffff"/>
+        <rect x="214" y="268" width="5" height="30" fill="#ffffff"/>
+        <polyline points="190,282 199,276 207,270 216,264" fill="none" stroke="#ffffff" stroke-width="2"/>
+        <polyline points="228,278 242,278 246,269 250,287 254,273 258,278 272,278" fill="none" stroke="#ffffff" stroke-width="2.5"/>
+        <line x1="234" y1="286" x2="234" y2="302" stroke="#ffffff" stroke-width="2"/>
+        <line x1="244" y1="286" x2="244" y2="302" stroke="#ffffff" stroke-width="2"/>
+        <line x1="256" y1="286" x2="256" y2="302" stroke="#ffffff" stroke-width="2"/>
+        <line x1="266" y1="286" x2="266" y2="302" stroke="#ffffff" stroke-width="2"/>
+        <rect x="282" y="284" width="18" height="11" fill="none" stroke="#ffffff" stroke-width="2"/>
+        <line x1="279" y1="297" x2="303" y2="297" stroke="#ffffff" stroke-width="2.5"/>
+        <line x1="308" y1="272" x2="308" y2="297" stroke="#ffffff" stroke-width="2"/>
+        <line x1="302" y1="278" x2="313" y2="278" stroke="#ffffff" stroke-width="2"/>
+        <text x="132" y="315" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-weight="bold" font-size="13" transform="rotate(-90 132 315)">١٤٣٥هـ</text>
+        <text x="368" y="315" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-weight="bold" font-size="13" transform="rotate(90 368 315)">2014م</text>
+        <text x="250" y="333" text-anchor="middle" fill="#ffffff" font-family="Cairo, Arial, sans-serif" font-weight="bold" font-size="25">الجامعة التقنية الشمالية</text>
+        <text x="250" y="355" text-anchor="middle" fill="#eab308" font-family="Arial, sans-serif" font-weight="bold" font-size="14" letter-spacing="0.5">NORTHERN TECHNICAL UNIVERSITY</text>
+        <text x="250" y="426" text-anchor="middle" fill="#eab308" font-family="Georgia, serif" font-weight="bold" font-size="66" letter-spacing="3">NTU</text>
+      </svg>
+    `);
+
+    const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024; // 50 ميجابايت
+    const UPLOAD_TIMEOUT_MS = 3 * 60 * 1000; // 3 دقائق
+
     const BRANCHES = [
       { id: 'kirkuk', name: 'كركوك' },
       { id: 'saladin', name: 'صلاح الدين' },
@@ -130,18 +233,6 @@
       { id: 'morning_hosting', name: 'استضافة صباحي' }
     ];
 
-    const DEFAULT_AUTH_CONFIG = {
-      doctorUser: 'NTU',
-      doctorPass: 'ARASS24',
-      coordinatorUser: 'ARASS',
-      coordinatorPass: 'ARASS24',
-      branchCodes: {
-        kirkuk: '1234',
-        saladin: '5678',
-        nineveh: '9000'
-      }
-    };
-
     // تنظيف النصوص والمسافات الزائدة وتوحيد الألف والهمزات للمطابقة الذكية
     const normalizeArabic = (str) => {
       if (!str) return '';
@@ -155,10 +246,76 @@
 
     const cleanSpaces = (str) => (str || '').trim().replace(/\s+/g, ' ');
 
+    // تنظيف اسم الملف قبل الرفع إلى Firebase Storage
+    const sanitizeStorageFileName = (originalName) => {
+      const parts = (originalName || 'file').split('.');
+      const ext = parts.length > 1 ? '.' + parts.pop().replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : '';
+      const base = parts.join('.').replace(/[^a-zA-Z0-9_-]/g, '');
+      return `${base || 'file'}${ext}`;
+    };
+
+    // ترجمة أخطاء Firebase Storage إلى رسائل عربية واضحة
+    const getStorageErrorMessage = (err) => {
+      if (!err) return 'حدث خطأ غير متوقع أثناء الرفع';
+      if (err.code === 'storage/unauthorized') return 'لا توجد صلاحية رفع للملفات (storage/unauthorized) - تأكد من قواعد Storage';
+      if (err.code === 'storage/retry-limit-exceeded') return 'فشل الرفع بسبب انقطاع الاتصال أو مشكلة في التخزين (storage/retry-limit-exceeded)';
+      if (err.code === 'storage/canceled') return 'تم إلغاء عملية الرفع';
+      if (err.code === 'custom/timeout') return 'انتهت المهلة القصوى للرفع (3 دقائق)، يرجى التحقق من سرعة الإنترنت والمحاولة مجدداً';
+      return `فشل الرفع: ${err.message || err.code || 'خطأ غير معروف'}`;
+    };
+
+    // دالة مساعدة للرفع مع تتبع التقدم، المهلة القصوى، وإمكانية الإلغاء
+    const uploadFileWithProgress = ({ storageRef, file, onProgress, onTaskCreated }) => {
+      return new Promise((resolve, reject) => {
+        const { uploadBytesResumable, getDownloadURL } = window.fb;
+        const metadata = file.type ? { contentType: file.type } : undefined;
+        const uploadTask = uploadBytesResumable(storageRef, file, metadata);
+        if (onTaskCreated) onTaskCreated(uploadTask);
+
+        let settled = false;
+        const timeoutId = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            try { uploadTask.cancel(); } catch (_) {}
+            reject({ code: 'custom/timeout', message: 'انتهت المهلة القصوى للرفع' });
+          }
+        }, UPLOAD_TIMEOUT_MS);
+
+        uploadTask.on(
+          'state_changed',
+          (snapshot) => {
+            if (snapshot.totalBytes > 0 && onProgress) {
+              const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+              onProgress(pct);
+            }
+          },
+          (error) => {
+            clearTimeout(timeoutId);
+            if (!settled) {
+              settled = true;
+              reject(error);
+            }
+          },
+          async () => {
+            clearTimeout(timeoutId);
+            if (!settled) {
+              try {
+                const url = await getDownloadURL(uploadTask.snapshot.ref);
+                settled = true;
+                resolve(url);
+              } catch (urlErr) {
+                settled = true;
+                reject(urlErr);
+              }
+            }
+          }
+        );
+      });
+    };
+
     // إنشاء معرّف نظيف للقسم ليكون مساراً آمناً في Firestore
     const slugifyDept = (deptName) => {
       const normalized = normalizeArabic(deptName).toLowerCase();
-      // تحويل النص العربي إلى معرّف آمن مع الحفاظ على التفرد
       let hash = 0;
       for (let i = 0; i < normalized.length; i++) {
         hash = ((hash << 5) - hash) + normalized.charCodeAt(i);
@@ -167,27 +324,32 @@
       return 'dept_' + Math.abs(hash).toString(36);
     };
 
+    // بناء معرّف ثابت للنتيجة لمنع التكرار عند إعادة النشر
+    const buildResultDocId = (studentId, subjectName, examType, examTitle) => {
+      const cleanIdPart = (val) => normalizeArabic(val || '').replace(/[\/\.\#\$\[\]\s]+/g, '_');
+      const subjPart = cleanIdPart(subjectName);
+      const titlePart = examType === 'daily' ? cleanIdPart(examTitle || `امتحان يومي - ${subjectName}`) : cleanIdPart(examType);
+      return `${studentId}__${subjPart}__${examType}__${titlePart}`;
+    };
+
+    // بناء البريد الداخلي للطالب من اسمه المطبّع وبياناته الأكاديمية لحسابات Firebase Auth
+    const buildStudentAuthEmail = (branchId, stageId, studyTypeId, deptId, normalizedName) => {
+      let hash = 0;
+      const seed = `${branchId}:${stageId}:${studyTypeId}:${deptId}:${normalizedName}`;
+      for (let i = 0; i < seed.length; i++) {
+        hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+        hash |= 0;
+      }
+      const hex = Math.abs(hash).toString(36);
+      return `stu_${branchId}_${deptId}_${hex}@ntu.local`;
+    };
+
     // بناء المسار المعزول بالكامل حسب المتطلبات:
     // branches/{branchId}/stages/{stage}/studyTypes/{studyType}/departments/{departmentId}
     const getIsolatedBasePath = (branchId, stageId, studyTypeId, deptName) => {
       const deptId = slugifyDept(deptName);
       return `branches/${branchId}/stages/${stageId}/studyTypes/${studyTypeId}/departments/${deptId}`;
     };
-
-    // تشفير الرمز السري باستخدام SHA-256 مع Salt
-    async function hashPassword(password, salt) {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(`${salt}:${password}:NTU_SECURE_2026`);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
-    function generateSalt() {
-      const array = new Uint8Array(16);
-      crypto.getRandomValues(array);
-      return Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
-    }
 
     // أيقونات SVG نظيفة
     const Icons = {
@@ -232,39 +394,29 @@
     // ==========================================
     // 2. مكون الشريط العلوي واللوغو الثابت (Header & Logo)
     // ==========================================
-    function Header({ logoUrl, onLogoUpload, userSession, onLogout, onOpenProfile, uploadingLogo }) {
-      const fileInputRef = useRef(null);
+    function Header({ logoUrl, userSession, onLogout, onOpenProfile }) {
+      const [logoFailed, setLogoFailed] = useState(false);
+
+      useEffect(() => {
+        setLogoFailed(false);
+      }, [logoUrl]);
 
       return (
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-            {/* أعلى اليمين: لوغو الجامعة الثابت مع إمكانية رفعه بسهولة */}
+            {/* أعلى اليمين: لوغو الجامعة الثابت */}
             <div className="flex items-center gap-3">
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                title="انقر لتغيير لوغو الجامعة"
-                className="relative group cursor-pointer w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-ntu-50 border-2 border-ntu-200 flex items-center justify-center overflow-hidden shadow-inner transition hover:border-ntu-600"
-              >
-                {logoUrl ? (
+              <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-ntu-50 border-2 border-ntu-200 flex items-center justify-center overflow-hidden shadow-inner">
+                {logoUrl && !logoFailed ? (
                   <img 
                     src={logoUrl} 
                     alt="لوغو جامعة التقنية الشمالية" 
-                    className="w-full h-full object-contain p-1"
-                    onError={(e) => { e.target.style.display = 'none'; }}
+                    className="w-full h-full object-contain"
+                    onError={() => setLogoFailed(true)}
                   />
                 ) : (
                   <Icons.University />
                 )}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-[10px] text-white font-bold text-center p-1">
-                  {uploadingLogo ? 'جاري الرفع...' : 'تغيير اللوغو'}
-                </div>
-                <input 
-                  ref={fileInputRef}
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={onLogoUpload}
-                />
               </div>
 
               <div>
@@ -318,6 +470,32 @@
           <div className={`${styles} px-4 py-3.5 rounded-2xl shadow-xl border flex items-center justify-between gap-3`}>
             <span className="text-sm font-bold leading-relaxed">{message}</span>
             <button onClick={onClose} className="text-white/80 hover:text-white font-bold text-lg px-1">✕</button>
+          </div>
+        </div>
+      );
+    }
+
+    function ConfirmModal({ isOpen, title, message, onConfirm, onCancel }) {
+      if (!isOpen) return null;
+      return (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <h4 className="text-lg font-extrabold text-slate-900">{title || 'تأكيد العملية'}</h4>
+            <p className="text-sm text-slate-600 font-semibold leading-relaxed">{message}</p>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={onConfirm}
+                className="flex-1 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm transition"
+              >
+                تأكيد الحذف
+              </button>
+              <button
+                onClick={onCancel}
+                className="flex-1 py-2.5 rounded-2xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-sm transition"
+              >
+                إلغاء
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -413,8 +591,7 @@
     // ==========================================
     // 4. الصفحة الرئيسية وبوابات الدخول (Landing & Auth)
     // ==========================================
-    function LandingAndAuth({ authConfig, onLoginSuccess, notify }) {
-      // الحالات: 'home' | 'student_login' | 'student_register' | 'doctor_login' | 'coordinator_login'
+    function LandingAndAuth({ departments, onSessionLoaded, notify }) {
       const [view, setView] = useState('home');
       const [loading, setLoading] = useState(false);
 
@@ -430,23 +607,31 @@
       const [regBranch, setRegBranch] = useState('kirkuk');
       const [regStudyType, setRegStudyType] = useState('morning');
       const [regStage, setRegStage] = useState('stage1');
-      const [regDept, setRegDept] = useState('');
+      const [regDept, setRegDept] = useState(departments[0] || DEFAULT_DEPARTMENTS[0]);
 
       // --- حقول دخول الدكتور (خطوات متسلسلة) ---
-      const [docStep, setDocStep] = useState(1); // 1: حساب عام، 2: الفرع ورمزه، 3: الاسم والمادة
+      const [docStep, setDocStep] = useState(1);
       const [docUser, setDocUser] = useState('');
       const [docPass, setDocPass] = useState('');
       const [docBranch, setDocBranch] = useState('kirkuk');
       const [docBranchCode, setDocBranchCode] = useState('');
       const [docFullName, setDocFullName] = useState('');
-      const [docSubjectDept, setDocSubjectDept] = useState('');
+      const [docSubject, setDocSubject] = useState('');
+      const [docDept, setDocDept] = useState(departments[0] || DEFAULT_DEPARTMENTS[0]);
 
       // --- حقول دخول مقرر القسم ---
       const [coordUser, setCoordUser] = useState('');
       const [coordPass, setCoordPass] = useState('');
-      const [coordDept, setCoordDept] = useState('');
+      const [coordDept, setCoordDept] = useState(departments[0] || DEFAULT_DEPARTMENTS[0]);
 
-      // التحقق من الاسم الرباعي
+      useEffect(() => {
+        if (departments.length > 0) {
+          if (!departments.includes(regDept)) setRegDept(departments[0]);
+          if (!departments.includes(docDept)) setDocDept(departments[0]);
+          if (!departments.includes(coordDept)) setCoordDept(departments[0]);
+        }
+      }, [departments]);
+
       const validateQuadName = (rawName) => {
         const cleaned = cleanSpaces(rawName);
         const words = cleaned.split(' ').filter(Boolean);
@@ -456,85 +641,7 @@
         return { valid: true, cleaned };
       };
 
-      // معالجة إنشاء حساب طالب
-      const handleStudentRegister = async (e) => {
-        e.preventDefault();
-        if (loading) return;
-
-        const nameCheck = validateQuadName(regName);
-        if (!nameCheck.valid) {
-          notify('يرجى كتابة الاسم الرباعي (4 كلمات على الأقل)', 'error');
-          return;
-        }
-        if (!regPass || regPass.length < 4) {
-          notify('يرجى إدخال رمز سري لا يقل عن 4 رموز', 'error');
-          return;
-        }
-        if (regPass !== regPassConfirm) {
-          notify('الرمز السري وتأكيده غير متطابقين', 'error');
-          return;
-        }
-        const cleanedDept = cleanSpaces(regDept);
-        if (!cleanedDept || cleanedDept.length < 3) {
-          notify('يرجى كتابة اسم القسم والكلية بشكل كامل', 'error');
-          return;
-        }
-
-        setLoading(true);
-        try {
-          const { db, collection, query, where, getDocs, addDoc, serverTimestamp } = window.fb;
-          const basePath = getIsolatedBasePath(regBranch, regStage, regStudyType, cleanedDept);
-          const studentsRef = collection(db, `${basePath}/students`);
-          const normName = normalizeArabic(nameCheck.cleaned);
-
-          // منع تكرار الحساب في نفس الفرع + النوع + المرحلة + القسم
-          const q = query(studentsRef, where('normalizedName', '==', normName));
-          const existingSnap = await getDocs(q);
-          if (!existingSnap.empty) {
-            notify('هذا الحساب مسجل مسبقاً في نفس القسم والمرحلة ونوع الدراسة!', 'error');
-            setLoading(false);
-            return;
-          }
-
-          const salt = generateSalt();
-          const passwordHash = await hashPassword(regPass, salt);
-
-          const studentData = {
-            fullName: nameCheck.cleaned,
-            normalizedName: normName,
-            passwordHash,
-            salt,
-            branchId: regBranch,
-            studyTypeId: regStudyType,
-            stageId: regStage,
-            departmentName: cleanedDept,
-            departmentId: slugifyDept(cleanedDept),
-            createdAt: serverTimestamp()
-          };
-
-          const docRef = await addDoc(studentsRef, studentData);
-          notify('تم إنشاء حسابك بنجاح! جاري الدخول...', 'success');
-
-          onLoginSuccess({
-            role: 'student',
-            studentId: docRef.id,
-            fullName: studentData.fullName,
-            normalizedName: normName,
-            branchId: regBranch,
-            studyTypeId: regStudyType,
-            stageId: regStage,
-            departmentName: cleanedDept,
-            departmentId: studentData.departmentId
-          });
-        } catch (err) {
-          console.error(err);
-          notify('حدث خطأ أثناء التسجيل، تأكد من الاتصال بالإنترنت', 'error');
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      // معالجة تسجيل دخول الطالب
+      // تسجيل دخول الطالب عبر Firebase Authentication (Email/Password)
       const handleStudentLogin = async (e) => {
         e.preventDefault();
         if (loading) return;
@@ -544,77 +651,90 @@
           notify('يرجى كتابة الاسم الرباعي المسجل به', 'error');
           return;
         }
-        if (!loginPass) {
-          notify('يرجى إدخال الرمز السري', 'error');
+        if (!loginPass || loginPass.length < 6) {
+          notify('يرجى إدخال الرمز السري (6 أحرف على الأقل)', 'error');
           return;
         }
 
         setLoading(true);
         try {
-          const { db, collection, query, where, getDocs } = window.fb;
+          const {
+            auth, db, doc, getDoc, collection, query, where, getDocs,
+            signInWithEmailAndPassword, signOut
+          } = window.fb;
           const normName = normalizeArabic(nameCheck.cleaned);
-          
-          // البحث ضمن الفرع المحدد عبر جميع المراحل وأنواع الدراسة والأقسام
-          // ملاحظة: لتسهيل الدخول على الطالب دون إدخال القسم كل مرة، نبحث في فهرس الطلاب الموحد للفرع أو عبر المراحل
-          let foundStudent = null;
-          for (const st of STAGES) {
-            for (const ty of STUDY_TYPES) {
-              // لا يمكن الاستعلام دون معرفة departmentId إلا عبر حفظ نسخة مرجعية في branches/{branch}/student_directory
-            }
-          }
-          // استخدام فهرس البحث السريع للفرع (branches/{branch}/student_index) للوصول المباشر للمسار المعزول
-          const indexRef = collection(db, `branches/${loginBranch}/student_index`);
-          const qIndex = query(indexRef, where('normalizedName', '==', normName));
-          const indexSnap = await getDocs(qIndex);
 
-          if (indexSnap.empty) {
-            notify('لم يتم العثور على طالب بهذا الاسم في هذا الفرع', 'error');
-            setLoading(false);
-            return;
-          }
+          // البحث في student_index عن البريد الداخلي المرتبط بالطالب
+          let candidateEmails = [];
+          try {
+            const indexRef = collection(db, `branches/${loginBranch}/student_index`);
+            const qIndex = query(indexRef, where('normalizedName', '==', normName));
+            const indexSnap = await getDocs(qIndex);
+            indexSnap.forEach((idxDoc) => {
+              const meta = idxDoc.data();
+              if (meta.authEmail) {
+                candidateEmails.push(meta.authEmail);
+              } else if (meta.departmentId && meta.stageId && meta.studyTypeId) {
+                candidateEmails.push(buildStudentAuthEmail(loginBranch, meta.stageId, meta.studyTypeId, meta.departmentId, normName));
+              }
+            });
+          } catch (_) {}
 
-          // التحقق من كلمة المرور المشفرة
-          for (const idxDoc of indexSnap.docs) {
-            const meta = idxDoc.data();
-            const studentDocRef = window.fb.doc(db, `${meta.basePath}/students/${meta.studentId}`);
-            const studentSnap = await window.fb.getDoc(studentDocRef);
-            if (studentSnap.exists()) {
-              const sData = studentSnap.data();
-              const checkHash = await hashPassword(loginPass, sData.salt);
-              if (checkHash === sData.passwordHash) {
-                foundStudent = { id: studentSnap.id, ...sData };
-                break;
+          // توليد احتمالات البريد من الأقسام الرسمية كاحتياط
+          if (candidateEmails.length === 0) {
+            for (const dName of departments) {
+              const dId = slugifyDept(dName);
+              for (const st of STAGES) {
+                for (const ty of STUDY_TYPES) {
+                  candidateEmails.push(buildStudentAuthEmail(loginBranch, st.id, ty.id, dId, normName));
+                }
               }
             }
           }
 
-          if (!foundStudent) {
-            notify('الرمز السري غير صحيح', 'error');
+          let signedUser = null;
+          for (const email of [...new Set(candidateEmails)]) {
+            try {
+              const cred = await signInWithEmailAndPassword(auth, email, loginPass);
+              signedUser = cred.user;
+              break;
+            } catch (authErr) {
+              if (authErr.code === 'auth/too-many-requests') {
+                throw authErr;
+              }
+            }
+          }
+
+          if (!signedUser) {
+            notify('الاسم الرباعي أو الرمز السري غير صحيح في هذا الفرع', 'error');
             setLoading(false);
             return;
           }
 
-          notify(`أهلاً بك، ${foundStudent.fullName}`, 'success');
-          onLoginSuccess({
-            role: 'student',
-            studentId: foundStudent.id,
-            fullName: foundStudent.fullName,
-            normalizedName: foundStudent.normalizedName,
-            branchId: foundStudent.branchId,
-            studyTypeId: foundStudent.studyTypeId,
-            stageId: foundStudent.stageId,
-            departmentName: foundStudent.departmentName,
-            departmentId: foundStudent.departmentId
-          });
+          const userSnap = await getDoc(doc(db, 'users', signedUser.uid));
+          if (!userSnap.exists() || userSnap.data().role !== 'student') {
+            await signOut(auth);
+            notify('لم يتم العثور على ملف الطالب، يرجى مراجعة الإدارة', 'error');
+            setLoading(false);
+            return;
+          }
+
+          const profile = { uid: signedUser.uid, ...userSnap.data() };
+          notify(`أهلاً بك، ${profile.fullName}`, 'success');
+          onSessionLoaded(profile);
         } catch (err) {
           console.error(err);
-          notify('حدث خطأ أثناء تسجيل الدخول', 'error');
+          if (err.code === 'auth/too-many-requests') {
+            notify('تم حظر المحاولات مؤقتاً لكثرة المحاولات الخاطئة، حاول لاحقاً', 'error');
+          } else {
+            notify('حدث خطأ أثناء تسجيل الدخول', 'error');
+          }
         } finally {
           setLoading(false);
         }
       };
 
-      // تحديث دالة التسجيل لإضافة المرجع في student_index لضمان سرعة الدخول وعزل البيانات
+      // إنشاء حساب طالب جديد عبر Firebase Auth (Email/Password) وحفظ users/{uid}
       const handleStudentRegisterWithIndex = async (e) => {
         e.preventDefault();
         if (loading) return;
@@ -624,8 +744,8 @@
           notify('يرجى كتابة الاسم الرباعي (4 كلمات على الأقل)', 'error');
           return;
         }
-        if (!regPass || regPass.length < 4) {
-          notify('يرجى إدخال رمز سري لا يقل عن 4 رموز', 'error');
+        if (!regPass || regPass.length < 6) {
+          notify('يرجى إدخال رمز سري لا يقل عن 6 أحرف', 'error');
           return;
         }
         if (regPass !== regPassConfirm) {
@@ -633,67 +753,100 @@
           return;
         }
         const cleanedDept = cleanSpaces(regDept);
-        if (!cleanedDept || cleanedDept.length < 3) {
-          notify('يرجى كتابة اسم القسم والكلية بشكل كامل', 'error');
+        if (!cleanedDept || !departments.includes(cleanedDept)) {
+          notify('يرجى اختيار القسم من القائمة المعتمدة', 'error');
           return;
         }
 
         setLoading(true);
         try {
-          const { db, collection, query, where, getDocs, addDoc, setDoc, doc, serverTimestamp } = window.fb;
-          const basePath = getIsolatedBasePath(regBranch, regStage, regStudyType, cleanedDept);
-          const studentsRef = collection(db, `${basePath}/students`);
-          const normName = normalizeArabic(nameCheck.cleaned);
+          const {
+            auth, db, setDoc, doc, serverTimestamp,
+            createUserWithEmailAndPassword
+          } = window.fb;
 
-          // منع تكرار الحساب: نفس الاسم الرباعي + الفرع + النوع + المرحلة + القسم
-          const q = query(studentsRef, where('normalizedName', '==', normName));
-          const existingSnap = await getDocs(q);
-          if (!existingSnap.empty) {
-            notify('عذراً، هذا الحساب مسجل مسبقاً في نفس القسم والمرحلة ونوع الدراسة!', 'error');
-            setLoading(false);
-            return;
+          const normName = normalizeArabic(nameCheck.cleaned);
+          const deptId = slugifyDept(cleanedDept);
+          const basePath = getIsolatedBasePath(regBranch, regStage, regStudyType, cleanedDept);
+          const authEmail = buildStudentAuthEmail(regBranch, regStage, regStudyType, deptId, normName);
+
+          // إنشاء حساب حقيقي في Firebase Authentication
+          let userCred;
+          try {
+            userCred = await createUserWithEmailAndPassword(auth, authEmail, regPass);
+          } catch (authErr) {
+            if (authErr.code === 'auth/email-already-in-use') {
+              notify('عذراً، هذا الحساب مسجل مسبقاً في نفس القسم والمرحلة ونوع الدراسة!', 'error');
+              setLoading(false);
+              return;
+            }
+            if (authErr.code === 'auth/weak-password') {
+              notify('الرمز السري ضعيف، يجب أن يتكون من 6 أحرف على الأقل', 'error');
+              setLoading(false);
+              return;
+            }
+            throw authErr;
           }
 
-          const salt = generateSalt();
-          const passwordHash = await hashPassword(regPass, salt);
+          const uid = userCred.user.uid;
 
           const studentData = {
+            uid,
+            studentId: uid,
             fullName: nameCheck.cleaned,
             normalizedName: normName,
-            passwordHash,
-            salt,
             branchId: regBranch,
             studyTypeId: regStudyType,
             stageId: regStage,
             departmentName: cleanedDept,
-            departmentId: slugifyDept(cleanedDept),
+            departmentId: deptId,
             createdAt: serverTimestamp()
           };
 
-          const docRef = await addDoc(studentsRef, studentData);
-          
-          // حفظ مؤشر البحث السريع في الفرع لتسهيل الدخول بالاسم والرمز فقط
-          await setDoc(doc(db, `branches/${regBranch}/student_index/${docRef.id}`), {
-            studentId: docRef.id,
+          // حفظ سجل الطالب في المسار الأكاديمي المعزول باستخدام uid
+          await setDoc(doc(db, `${basePath}/students/${uid}`), studentData);
+
+          // حفظ مستند المستخدم المعتمد للصلاحيات في users/{uid}
+          const userProfile = {
+            uid,
+            role: 'student',
+            studentId: uid,
+            fullName: nameCheck.cleaned,
             normalizedName: normName,
+            branchId: regBranch,
+            studyTypeId: regStudyType,
+            stageId: regStage,
+            departmentName: cleanedDept,
+            departmentId: deptId,
+            createdAt: serverTimestamp()
+          };
+          await setDoc(doc(db, 'users', uid), userProfile);
+
+          // حفظ مؤشر البحث السريع في الفرع لتسهيل الدخول بالاسم والرمز فقط
+          await setDoc(doc(db, `branches/${regBranch}/student_index/${uid}`), {
+            studentId: uid,
+            normalizedName: normName,
+            authEmail,
             basePath,
             branchId: regBranch,
             stageId: regStage,
             studyTypeId: regStudyType,
-            departmentName: cleanedDept
+            departmentName: cleanedDept,
+            departmentId: deptId
           });
 
           notify('تم إنشاء حسابك بنجاح!', 'success');
-          onLoginSuccess({
+          onSessionLoaded({
+            uid,
             role: 'student',
-            studentId: docRef.id,
-            fullName: studentData.fullName,
+            studentId: uid,
+            fullName: nameCheck.cleaned,
             normalizedName: normName,
             branchId: regBranch,
             studyTypeId: regStudyType,
             stageId: regStage,
             departmentName: cleanedDept,
-            departmentId: studentData.departmentId
+            departmentId: deptId
           });
         } catch (err) {
           console.error(err);
@@ -703,92 +856,156 @@
         }
       };
 
-      // خطوات دخول الدكتور
+      // خطوات دخول الدكتور (التحقق الفعلي يتم في الخادم عبر Cloud Function claimRole)
       const handleDoctorStep1 = (e) => {
         e.preventDefault();
-        if (cleanSpaces(docUser).toUpperCase() === authConfig.doctorUser && docPass === authConfig.doctorPass) {
-          setDocStep(2);
-          notify('تم التحقق من بيانات الدخول الأساسية', 'success');
-        } else {
-          notify('اسم المستخدم أو الرمز السري غير صحيح', 'error');
+        if (!cleanSpaces(docUser) || !docPass) {
+          notify('يرجى إدخال اسم الدخول والرمز السري', 'error');
+          return;
         }
+        setDocStep(2);
       };
 
       const handleDoctorStep2 = (e) => {
         e.preventDefault();
-        const expectedCode = authConfig.branchCodes[docBranch];
-        if (docBranchCode.trim() === String(expectedCode)) {
-          setDocStep(3);
-          notify('تم التحقق من رمز الفرع بنجاح', 'success');
-        } else {
-          notify('رمز الفرع غير صحيح، يرجى التأكد والمحاولة مجدداً', 'error');
+        if (!docBranchCode.trim()) {
+          notify('يرجى إدخال رمز الفرع', 'error');
+          return;
         }
+        setDocStep(3);
       };
 
       const handleDoctorStep3 = async (e) => {
         e.preventDefault();
+        if (loading) return;
+
         const cleanedName = cleanSpaces(docFullName);
         const words = cleanedName.split(' ').filter(Boolean);
         if (!cleanedName.startsWith('دكتور') || words.length < 2) {
           notify('يجب أن يبدأ الاسم بكلمة "دكتور" متبوعة بالاسم الكامل (ثنائي أو ثلاثي أو رباعي)', 'error');
           return;
         }
-        const cleanedSubj = cleanSpaces(docSubjectDept);
-        if (!cleanedSubj || cleanedSubj.length < 3) {
-          notify('يرجى كتابة اسم المادة والقسم', 'error');
+        const cleanedSubj = cleanSpaces(docSubject);
+        if (!cleanedSubj || cleanedSubj.length < 2) {
+          notify('يرجى كتابة اسم المادة الدراسية', 'error');
+          return;
+        }
+        const cleanedDept = cleanSpaces(docDept);
+        if (!cleanedDept || !departments.includes(cleanedDept)) {
+          notify('يرجى اختيار القسم من القائمة المعتمدة', 'error');
           return;
         }
 
         setLoading(true);
         try {
-          const { db, doc, setDoc, serverTimestamp } = window.fb;
-          const docId = 'doc_' + normalizeArabic(cleanedName).replace(/\s+/g, '_');
-          await setDoc(doc(db, `branches/${docBranch}/doctors/${docId}`), {
-            doctorName: cleanedName,
+          const { auth, signInAnonymously, functions, httpsCallable, db, doc, getDoc } = window.fb;
+          if (!auth.currentUser) {
+            await signInAnonymously(auth);
+          }
+
+          const subjectAndDept = `${cleanedSubj} – ${cleanedDept}`;
+          const deptId = slugifyDept(cleanedDept);
+
+          const claimRoleFn = httpsCallable(functions, 'claimRole');
+          await claimRoleFn({
+            role: 'doctor',
+            username: cleanSpaces(docUser),
+            password: docPass,
             branchId: docBranch,
-            subjectAndDept: cleanedSubj,
-            lastLogin: serverTimestamp()
-          }, { merge: true });
+            branchCode: docBranchCode.trim(),
+            doctorName: cleanedName,
+            subjectName: cleanedSubj,
+            departmentName: cleanedDept,
+            departmentId: deptId,
+            subjectAndDept
+          });
+
+          // تحديث التوكن للحصول على Custom Claims الجديدة فوراً
+          await auth.currentUser.getIdToken(true);
+
+          const userSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+          const profile = userSnap.exists()
+            ? { uid: auth.currentUser.uid, ...userSnap.data() }
+            : {
+                uid: auth.currentUser.uid,
+                role: 'doctor',
+                doctorId: auth.currentUser.uid,
+                doctorName: cleanedName,
+                branchId: docBranch,
+                departmentName: cleanedDept,
+                departmentId: deptId,
+                subjectAndDept
+              };
 
           notify(`مرحباً ${cleanedName}`, 'success');
-          onLoginSuccess({
-            role: 'doctor',
-            doctorId: docId,
-            doctorName: cleanedName,
-            branchId: docBranch,
-            subjectAndDept: cleanedSubj
-          });
+          onSessionLoaded(profile);
         } catch (err) {
           console.error(err);
-          notify('حدث خطأ أثناء حفظ بيانات الدكتور', 'error');
+          const msg = err?.message || 'فشل التحقق من بيانات الدكتور أو رمز الفرع';
+          notify(msg, 'error');
         } finally {
           setLoading(false);
         }
       };
 
-      // دخول مقرر القسم
-      const handleCoordinatorLogin = (e) => {
+      // دخول مقرر القسم (التحقق الفعلي يتم في الخادم عبر Cloud Function claimRole)
+      const handleCoordinatorLogin = async (e) => {
         e.preventDefault();
-        if (cleanSpaces(coordUser).toUpperCase() !== authConfig.coordinatorUser || coordPass !== authConfig.coordinatorPass) {
-          notify('بيانات دخول مقرر القسم غير صحيحة', 'error');
+        if (loading) return;
+
+        if (!cleanSpaces(coordUser) || !coordPass) {
+          notify('يرجى إدخال اسم الدخول والرمز السري', 'error');
           return;
         }
         const cleanedDept = cleanSpaces(coordDept);
-        if (!cleanedDept || cleanedDept.length < 3) {
-          notify('يرجى كتابة اسم القسم الذي تديره بدقة', 'error');
+        if (!cleanedDept || !departments.includes(cleanedDept)) {
+          notify('يرجى اختيار القسم من القائمة المعتمدة', 'error');
           return;
         }
-        notify('تم تسجيل الدخول بصفة مقرر قسم', 'success');
-        onLoginSuccess({
-          role: 'coordinator',
-          departmentName: cleanedDept,
-          departmentId: slugifyDept(cleanedDept)
-        });
+
+        setLoading(true);
+        try {
+          const { auth, signInAnonymously, functions, httpsCallable, db, doc, getDoc } = window.fb;
+          if (!auth.currentUser) {
+            await signInAnonymously(auth);
+          }
+
+          const deptId = slugifyDept(cleanedDept);
+          const claimRoleFn = httpsCallable(functions, 'claimRole');
+          await claimRoleFn({
+            role: 'coordinator',
+            username: cleanSpaces(coordUser),
+            password: coordPass,
+            departmentName: cleanedDept,
+            departmentId: deptId
+          });
+
+          // تحديث التوكن للحصول على Custom Claims الجديدة فوراً
+          await auth.currentUser.getIdToken(true);
+
+          const userSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+          const profile = userSnap.exists()
+            ? { uid: auth.currentUser.uid, ...userSnap.data() }
+            : {
+                uid: auth.currentUser.uid,
+                role: 'coordinator',
+                departmentName: cleanedDept,
+                departmentId: deptId
+              };
+
+          notify('تم تسجيل الدخول بصفة مقرر قسم', 'success');
+          onSessionLoaded(profile);
+        } catch (err) {
+          console.error(err);
+          const msg = err?.message || 'بيانات دخول مقرر القسم غير صحيحة';
+          notify(msg, 'error');
+        } finally {
+          setLoading(false);
+        }
       };
 
       return (
         <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center p-4">
-          {/* البطاقة الرئيسية في الواجهة الأولى */}
           {view === 'home' && (
             <div className="w-full max-w-md glass-card rounded-3xl p-6 sm:p-8 shadow-xl text-center space-y-6">
               <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-ntu-600 to-ntu-800 text-white flex items-center justify-center shadow-lg">
@@ -803,7 +1020,6 @@
                 <p className="text-sm text-slate-500 mt-1">اختر بوابة الدخول للمتابعة</p>
               </div>
 
-              {/* أزرار الطلاب */}
               <div className="space-y-3 pt-2">
                 <button
                   onClick={() => setView('student_login')}
@@ -819,7 +1035,6 @@
                 </button>
               </div>
 
-              {/* خط فاصل وبوابات الكادر التدريسي والإداري */}
               <div className="pt-4 border-t border-slate-200 flex flex-col items-center gap-3">
                 <button
                   onClick={() => { setDocStep(1); setView('doctor_login'); }}
@@ -837,7 +1052,6 @@
             </div>
           )}
 
-          {/* واجهة تسجيل دخول الطالب */}
           {view === 'student_login' && (
             <div className="w-full max-w-md glass-card rounded-3xl p-6 sm:p-8 shadow-xl">
               <div className="flex items-center justify-between mb-6">
@@ -890,7 +1104,6 @@
             </div>
           )}
 
-          {/* واجهة إنشاء حساب طالب */}
           {view === 'student_register' && (
             <div className="w-full max-w-lg glass-card rounded-3xl p-6 sm:p-8 shadow-xl my-4">
               <div className="flex items-center justify-between mb-5">
@@ -912,7 +1125,7 @@
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">إنشاء رمز سري</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">إنشاء رمز سري (6 أحرف على الأقل)</label>
                     <input
                       type="password"
                       value={regPass}
@@ -970,16 +1183,15 @@
 
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">القسم</label>
-                  <input
-                    type="text"
+                  <select
                     value={regDept}
                     onChange={(e) => setRegDept(e.target.value)}
-                    placeholder="مثال: قسم المختبرات الطبية – الكلية الصحية والطبية"
-                    className="w-full p-3 rounded-2xl border border-slate-300 focus:ring-2 focus:ring-ntu-600 outline-none"
-                  />
+                    className="w-full p-3 rounded-2xl border border-slate-300 bg-white focus:ring-2 focus:ring-ntu-600 outline-none font-semibold"
+                  >
+                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
                 </div>
 
-                {/* نص تنبيه ظاهر */}
                 <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs sm:text-sm font-bold flex items-center gap-2">
                   <span>⚠️</span>
                   <span>رجاءً احفظ الرمز السري لعدم نسيانه</span>
@@ -996,7 +1208,6 @@
             </div>
           )}
 
-          {/* واجهة دخول الدكتور (3 مراحل) */}
           {view === 'doctor_login' && (
             <div className="w-full max-w-md glass-card rounded-3xl p-6 sm:p-8 shadow-xl">
               <div className="flex items-center justify-between mb-6">
@@ -1066,9 +1277,14 @@
                       className="w-full p-3.5 rounded-2xl border border-slate-300 focus:ring-2 focus:ring-ntu-600 outline-none"
                     />
                   </div>
-                  <button type="submit" className="w-full py-3.5 rounded-2xl bg-ntu-700 hover:bg-ntu-800 text-white font-bold transition">
-                    تحقق ومتابعة
-                  </button>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setDocStep(1)} className="px-4 py-3.5 rounded-2xl bg-slate-200 text-slate-800 font-bold">
+                      السابق
+                    </button>
+                    <button type="submit" className="flex-1 py-3.5 rounded-2xl bg-ntu-700 hover:bg-ntu-800 text-white font-bold transition">
+                      متابعة
+                    </button>
+                  </div>
                 </form>
               )}
 
@@ -1085,24 +1301,38 @@
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">اسم المادة والقسم</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">اسم المادة</label>
                     <input
                       type="text"
-                      value={docSubjectDept}
-                      onChange={(e) => setDocSubjectDept(e.target.value)}
-                      placeholder="مثال: طفيليات – قسم المختبرات الطبية"
+                      value={docSubject}
+                      onChange={(e) => setDocSubject(e.target.value)}
+                      placeholder="مثال: طفيليات"
                       className="w-full p-3.5 rounded-2xl border border-slate-300 focus:ring-2 focus:ring-ntu-600 outline-none"
                     />
                   </div>
-                  <button type="submit" disabled={loading} className="w-full py-3.5 rounded-2xl bg-ntu-700 hover:bg-ntu-800 text-white font-bold transition">
-                    {loading ? 'جاري الدخول...' : 'دخول إلى لوحة الدكتور'}
-                  </button>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">القسم</label>
+                    <select
+                      value={docDept}
+                      onChange={(e) => setDocDept(e.target.value)}
+                      className="w-full p-3.5 rounded-2xl border border-slate-300 bg-white focus:ring-2 focus:ring-ntu-600 outline-none font-semibold"
+                    >
+                      {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setDocStep(2)} className="px-4 py-3.5 rounded-2xl bg-slate-200 text-slate-800 font-bold">
+                      السابق
+                    </button>
+                    <button type="submit" disabled={loading} className="flex-1 py-3.5 rounded-2xl bg-ntu-700 hover:bg-ntu-800 text-white font-bold transition">
+                      {loading ? 'جاري التحقق والدخول...' : 'دخول إلى لوحة الدكتور'}
+                    </button>
+                  </div>
                 </form>
               )}
             </div>
           )}
 
-          {/* واجهة دخول مقرر القسم */}
           {view === 'coordinator_login' && (
             <div className="w-full max-w-md glass-card rounded-3xl p-6 sm:p-8 shadow-xl">
               <div className="flex items-center justify-between mb-6">
@@ -1133,16 +1363,16 @@
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">اسم القسم</label>
-                  <input
-                    type="text"
+                  <select
                     value={coordDept}
                     onChange={(e) => setCoordDept(e.target.value)}
-                    placeholder="مثال: قسم المختبرات الطبية – الكلية الصحية والطبية"
-                    className="w-full p-3.5 rounded-2xl border border-slate-300 focus:ring-2 focus:ring-ntu-600 outline-none"
-                  />
+                    className="w-full p-3.5 rounded-2xl border border-slate-300 bg-white focus:ring-2 focus:ring-ntu-600 outline-none font-semibold"
+                  >
+                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
                 </div>
-                <button type="submit" className="w-full py-3.5 rounded-2xl bg-ntu-700 hover:bg-ntu-800 text-white font-bold transition">
-                  دخول مقرر القسم
+                <button type="submit" disabled={loading} className="w-full py-3.5 rounded-2xl bg-ntu-700 hover:bg-ntu-800 text-white font-bold transition">
+                  {loading ? 'جاري التحقق...' : 'دخول مقرر القسم'}
                 </button>
               </form>
             </div>
@@ -1155,28 +1385,26 @@
     // 5. واجهة الطالب (Student Dashboard)
     // ==========================================
     function StudentDashboard({ session, notify }) {
-      const [activeTab, setActiveTab] = useState('lectures'); // 'lectures' | 'schedule' | 'results'
+      const [activeTab, setActiveTab] = useState('lectures');
       const [lectures, setLectures] = useState([]);
       const [scheduleUrl, setScheduleUrl] = useState(null);
       const [results, setResults] = useState([]);
       const [loadingData, setLoadingData] = useState(true);
       const [zoomSchedule, setZoomSchedule] = useState(false);
+      const [downloadingId, setDownloadingId] = useState(null);
 
-      // حالات التنقل داخل النتائج
       const [selectedSubject, setSelectedSubject] = useState(null);
-      const [examCategory, setExamCategory] = useState(null); // 'daily' | 'sem1' | 'sem2'
-      const [subExamType, setSubExamType] = useState(null); // 'mid' | 'final'
+      const [examCategory, setExamCategory] = useState(null);
+      const [subExamType, setSubExamType] = useState(null);
 
       const basePath = useMemo(() => {
         return getIsolatedBasePath(session.branchId, session.stageId, session.studyTypeId, session.departmentName);
       }, [session]);
 
-      // الاستماع اللحظي للبيانات المعزولة الخاصة بالطالب فقط
       useEffect(() => {
         const { db, collection, doc, query, where, onSnapshot } = window.fb;
         setLoadingData(true);
 
-        // 1. محاضرات نفس الفرع والمرحلة ونوع الدراسة والقسم
         const unsubLectures = onSnapshot(collection(db, `${basePath}/lectures`), (snap) => {
           const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           setLectures(list);
@@ -1186,7 +1414,6 @@
           setLoadingData(false);
         });
 
-        // 2. صورة الجدول الخاصة بالقسم والمرحلة ونوع الدراسة
         const unsubSchedule = onSnapshot(doc(db, `${basePath}/schedule/current`), (docSnap) => {
           if (docSnap.exists()) {
             setScheduleUrl(docSnap.data().imageUrl);
@@ -1195,7 +1422,6 @@
           }
         });
 
-        // 3. نتائج هذا الطالب حصراً (مفلترة بـ studentId)
         const qResults = query(
           collection(db, `${basePath}/results`),
           where('studentId', '==', session.studentId)
@@ -1212,7 +1438,30 @@
         };
       }, [basePath, session.studentId]);
 
-      // تجميع المحاضرات حسب (المادة + النوع عملي/نظري) ثم حسب الدكتور
+      // تنزيل فعلي لملف المحاضرة باسمه الأصلي
+      const handleDownloadLecture = async (lec) => {
+        if (downloadingId === lec.id) return;
+        setDownloadingId(lec.id);
+        try {
+          const response = await fetch(lec.fileUrl);
+          if (!response.ok) throw new Error('Fetch failed');
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = lec.fileName || `${lec.title}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+        } catch (err) {
+          console.warn('Direct blob download fallback:', err);
+          window.open(lec.fileUrl, '_blank', 'noopener,noreferrer');
+        } finally {
+          setDownloadingId(null);
+        }
+      };
+
       const groupedLectures = useMemo(() => {
         const groups = {};
         lectures.forEach(lec => {
@@ -1225,7 +1474,6 @@
         return groups;
       }, [lectures]);
 
-      // استخراج قائمة المواد المتوفرة في نتائج الطالب أو محاضراته
       const availableSubjects = useMemo(() => {
         const set = new Set();
         results.forEach(r => set.add(r.subjectName));
@@ -1233,7 +1481,6 @@
         return Array.from(set);
       }, [results, lectures]);
 
-      // تصفية الدرجات المعروضة بناءً على اختيار الطالب الدقيق
       const filteredStudentResults = useMemo(() => {
         if (!selectedSubject || !examCategory) return [];
         let targetExamType = '';
@@ -1255,14 +1502,12 @@
 
       return (
         <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
-          {/* شريط ترحيبي */}
           <div className="bg-gradient-to-l from-ntu-800 to-ntu-600 rounded-3xl p-5 sm:p-6 text-white shadow-lg">
             <p className="text-ntu-100 text-xs sm:text-sm font-semibold">مرحباً بك في بوابة الطالب</p>
             <h2 className="text-xl sm:text-2xl font-extrabold mt-1">{session.fullName}</h2>
             <p className="text-xs sm:text-sm text-ntu-100 mt-1 opacity-90">{session.departmentName}</p>
           </div>
 
-          {/* أزرار الأقسام الرئيسية الثلاثة */}
           <div className="grid grid-cols-3 gap-3">
             <button
               onClick={() => setActiveTab('lectures')}
@@ -1301,7 +1546,6 @@
             </button>
           </div>
 
-          {/* 1. قسم المحاضرات */}
           {activeTab === 'lectures' && (
             <div className="space-y-5">
               {loadingData ? (
@@ -1341,15 +1585,14 @@
                                   >
                                     فتح
                                   </a>
-                                  <a
-                                    href={lec.fileUrl}
-                                    download={lec.fileName || lec.title}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-3 py-1.5 rounded-xl bg-ntu-700 hover:bg-ntu-800 text-white font-bold text-xs transition"
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadLecture(lec)}
+                                    disabled={downloadingId === lec.id}
+                                    className="px-3 py-1.5 rounded-xl bg-ntu-700 hover:bg-ntu-800 disabled:opacity-60 text-white font-bold text-xs transition"
                                   >
-                                    تنزيل
-                                  </a>
+                                    {downloadingId === lec.id ? 'جاري التنزيل...' : 'تنزيل'}
+                                  </button>
                                 </div>
                               </div>
                             ))}
@@ -1363,7 +1606,6 @@
             </div>
           )}
 
-          {/* 2. قسم الجدول الدراسي */}
           {activeTab === 'schedule' && (
             <div className="glass-card rounded-3xl p-5 sm:p-6 shadow-sm text-center">
               <h3 className="text-lg font-extrabold text-slate-900 mb-4">الجدول الدراسي الأسبوعي</h3>
@@ -1388,7 +1630,6 @@
                 </div>
               )}
 
-              {/* نافذة تكبير الجدول */}
               {zoomSchedule && scheduleUrl && (
                 <div 
                   onClick={() => setZoomSchedule(false)}
@@ -1400,7 +1641,6 @@
             </div>
           )}
 
-          {/* 3. قسم النتائج */}
           {activeTab === 'results' && (
             <div className="glass-card rounded-3xl p-5 sm:p-6 shadow-sm space-y-6">
               <h3 className="text-lg font-extrabold text-slate-900">نتائج الامتحانات</h3>
@@ -1409,7 +1649,6 @@
                 <p className="text-center py-8 text-slate-500 font-bold">لا توجد مواد أو درجات منشورة لك حالياً.</p>
               ) : (
                 <>
-                  {/* اختيار المادة */}
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">1. اختر المادة الدراسية:</label>
                     <div className="flex flex-wrap gap-2">
@@ -1433,7 +1672,6 @@
                     </div>
                   </div>
 
-                  {/* اختيار نوع الامتحان للمادة المختارة */}
                   {selectedSubject && (
                     <div className="pt-4 border-t border-slate-100 space-y-4">
                       <label className="block text-sm font-bold text-slate-700">2. اختر نوع الامتحان لمادة ({selectedSubject}):</label>
@@ -1464,7 +1702,6 @@
                         </button>
                       </div>
 
-                      {/* خانتان مستقلتان: ميدتيرم / فاينل عند اختيار الفصل الأول أو الثاني */}
                       {(examCategory === 'sem1' || examCategory === 'sem2') && (
                         <div className="pt-3 flex gap-3">
                           <button
@@ -1486,7 +1723,6 @@
                         </div>
                       )}
 
-                      {/* عرض درجة الطالب فقط */}
                       {(examCategory === 'daily' || subExamType) && (
                         <div className="mt-5 p-5 rounded-3xl bg-ntu-50 border-2 border-ntu-200">
                           {filteredStudentResults.length === 0 ? (
@@ -1501,8 +1737,8 @@
                                       {res.examTitle || res.subjectName}
                                     </p>
                                   </div>
-                                  <div className="px-5 py-2.5 rounded-2xl bg-ntu-700 text-white font-extrabold text-xl shadow">
-                                    {res.score}
+                                  <div className="px-5 py-2.5 rounded-2xl bg-ntu-700 text-white font-extrabold text-xl shadow" dir="ltr">
+                                    {res.maxScore ? `${res.score} / ${res.maxScore}` : res.score}
                                   </div>
                                 </div>
                               ))}
@@ -1523,52 +1759,71 @@
     // ==========================================
     // 6. واجهة الدكتور (Doctor Dashboard)
     // ==========================================
-    function DoctorDashboard({ session, notify }) {
-      const [activeTab, setActiveTab] = useState('lectures'); // 'lectures' | 'daily_grades' | 'schedule'
+    function DoctorDashboard({ session, departments, notify }) {
+      const [activeTab, setActiveTab] = useState('lectures'); // 'lectures' | 'daily_grades'
 
       // --- حقول رفع محاضرة ---
       const [subjectName, setSubjectName] = useState('');
-      const [lectureType, setLectureType] = useState('theoretical'); // 'theoretical' | 'practical'
+      const [lectureType, setLectureType] = useState('theoretical');
       const [lectureTitle, setLectureTitle] = useState('');
       const [stageId, setStageId] = useState('stage1');
       const [studyTypeId, setStudyTypeId] = useState('morning');
-      const [deptName, setDeptName] = useState('');
+      const [deptName, setDeptName] = useState(session.departmentName || departments[0] || DEFAULT_DEPARTMENTS[0]);
       const [lectureFile, setLectureFile] = useState(null);
       const [uploading, setUploading] = useState(false);
+      const [uploadProgress, setUploadProgress] = useState(0);
+      const lectureUploadTaskRef = useRef(null);
+      const lectureFileInputRef = useRef(null);
 
       // محاضرات الدكتور الحالية (للحذف أو التعديل)
       const [myLectures, setMyLectures] = useState([]);
       const [editingLecture, setEditingLecture] = useState(null);
+      const [lectureToDelete, setLectureToDelete] = useState(null);
 
       // --- حقول رفع درجات الامتحانات اليومية ---
       const [gradeSubject, setGradeSubject] = useState('');
       const [gradeExamTitle, setGradeExamTitle] = useState('');
       const [gradeStage, setGradeStage] = useState('stage1');
       const [gradeStudyType, setGradeStudyType] = useState('morning');
-      const [gradeDept, setGradeDept] = useState('');
+      const [gradeDept, setGradeDept] = useState(session.departmentName || departments[0] || DEFAULT_DEPARTMENTS[0]);
       const [rawPasteText, setRawPasteText] = useState('');
-      const [parsedRows, setParsedRows] = useState([]); // { rawName, score, matchedStudent, status: 'matched'|'unmatched' }
+      const [parsedRows, setParsedRows] = useState([]);
       const [reviewMode, setReviewMode] = useState(false);
       const [publishingGrades, setPublishingGrades] = useState(false);
 
-      // --- رفع صورة الجدول ---
-      const [schedStage, setSchedStage] = useState('stage1');
-      const [schedStudyType, setSchedStudyType] = useState('morning');
-      const [schedDept, setSchedDept] = useState('');
-      const [schedFile, setSchedFile] = useState(null);
+      const doctorUid = session.uid || session.doctorId;
+
+      useEffect(() => {
+        if (departments.length > 0) {
+          if (!departments.includes(deptName)) setDeptName(departments[0]);
+          if (!departments.includes(gradeDept)) setGradeDept(departments[0]);
+        }
+      }, [departments]);
 
       // جلب محاضرات هذا الدكتور فقط ضمن الفرع
       useEffect(() => {
         const { db, collection, query, where, onSnapshot } = window.fb;
         const q = query(
           collection(db, `branches/${session.branchId}/doctor_lectures_index`),
-          where('doctorId', '==', session.doctorId)
+          where('doctorId', '==', doctorUid)
         );
         const unsub = onSnapshot(q, (snap) => {
           setMyLectures(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
         return () => unsub();
-      }, [session]);
+      }, [session.branchId, doctorUid]);
+
+      // إلغاء رفع المحاضرة
+      const handleCancelLectureUpload = () => {
+        if (lectureUploadTaskRef.current) {
+          try {
+            lectureUploadTaskRef.current.cancel();
+          } catch (_) {}
+          lectureUploadTaskRef.current = null;
+        }
+        setUploading(false);
+        setUploadProgress(0);
+      };
 
       // إضافة محاضرة جديدة
       const handleAddLecture = async (e) => {
@@ -1584,26 +1839,43 @@
           return;
         }
 
+        if (!departments.includes(cleanDept)) {
+          notify('يرجى اختيار القسم من القائمة المعتمدة', 'error');
+          return;
+        }
+
+        if (lectureFile.size > MAX_UPLOAD_SIZE_BYTES) {
+          notify('حجم الملف يتجاوز الحد الأقصى المسموح به (50 ميجابايت)', 'error');
+          return;
+        }
+
         setUploading(true);
+        setUploadProgress(0);
         try {
-          const { storage, ref, uploadBytesResumable, getDownloadURL, db, collection, addDoc, setDoc, doc, serverTimestamp } = window.fb;
+          const { storage, ref, db, collection, addDoc, setDoc, doc, serverTimestamp } = window.fb;
           const basePath = getIsolatedBasePath(session.branchId, stageId, studyTypeId, cleanDept);
-          const storagePath = `${basePath}/lectures/${Date.now()}_${lectureFile.name}`;
+          const safeFileName = sanitizeStorageFileName(lectureFile.name);
+          const storagePath = `${basePath}/lectures/${Date.now()}_${safeFileName}`;
           const storageRef = ref(storage, storagePath);
 
-          const uploadTask = await uploadBytesResumable(storageRef, lectureFile);
-          const fileUrl = await getDownloadURL(uploadTask.ref);
+          const fileUrl = await uploadFileWithProgress({
+            storageRef,
+            file: lectureFile,
+            onProgress: (pct) => setUploadProgress(pct),
+            onTaskCreated: (task) => { lectureUploadTaskRef.current = task; }
+          });
 
           const lecPayload = {
             subjectName: cleanSubj,
             lectureType,
             title: cleanTitle,
-            doctorId: session.doctorId,
+            doctorId: doctorUid,
             doctorName: session.doctorName,
             branchId: session.branchId,
             stageId,
             studyTypeId,
             departmentName: cleanDept,
+            departmentId: slugifyDept(cleanDept),
             fileUrl,
             storagePath,
             fileName: lectureFile.name,
@@ -1611,7 +1883,6 @@
           };
 
           const addedRef = await addDoc(collection(db, `${basePath}/lectures`), lecPayload);
-          // حفظ مرجع في فهرس الدكتور ليتمكن من تعديلها أو حذفها
           await setDoc(doc(db, `branches/${session.branchId}/doctor_lectures_index/${addedRef.id}`), {
             ...lecPayload,
             lectureDocPath: `${basePath}/lectures/${addedRef.id}`
@@ -1620,16 +1891,21 @@
           notify('تم رفع ونشر المحاضرة بنجاح!', 'success');
           setLectureTitle('');
           setLectureFile(null);
+          if (lectureFileInputRef.current) lectureFileInputRef.current.value = '';
         } catch (err) {
-          console.error(err);
-          notify('فشل رفع المحاضرة، يرجى المحاولة مجدداً', 'error');
+          console.error('Lecture upload error:', err);
+          notify(getStorageErrorMessage(err), 'error');
         } finally {
+          lectureUploadTaskRef.current = null;
           setUploading(false);
+          setUploadProgress(0);
         }
       };
 
-      // حذف محاضرة للدكتور
-      const handleDeleteLecture = async (lec) => {
+      const confirmDeleteLecture = async () => {
+        if (!lectureToDelete) return;
+        const lec = lectureToDelete;
+        setLectureToDelete(null);
         try {
           const { db, doc, deleteDoc, storage, ref, deleteObject } = window.fb;
           if (lec.lectureDocPath) {
@@ -1646,7 +1922,6 @@
         }
       };
 
-      // تعديل عنوان المحاضرة
       const handleUpdateLectureTitle = async () => {
         if (!editingLecture || !cleanSpaces(editingLecture.title)) return;
         try {
@@ -1663,7 +1938,6 @@
         }
       };
 
-      // قراءة ملف Excel / CSV للدرجات
       const handleExcelUpload = (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -1683,12 +1957,11 @@
         reader.readAsBinaryString(file);
       };
 
-      // تحليل ومطابقة أسماء الطلاب مع قاعدة البيانات قبل النشر
       const handleAnalyzeAndMatchGrades = async () => {
         const cleanSubj = cleanSpaces(gradeSubject);
         const cleanDept = cleanSpaces(gradeDept);
         if (!cleanSubj || !cleanDept || !rawPasteText.trim()) {
-          notify('يرجى إدخال اسم المادة والقسم وقائمة الطلاب والدرجات', 'error');
+          notify('يرجى إدخال اسم المادة واختيار القسم وكتابة قائمة الطلاب والدرجات', 'error');
           return;
         }
 
@@ -1701,7 +1974,6 @@
 
           const lines = rawPasteText.split('\n').map(l => l.trim()).filter(Boolean);
           const analyzed = lines.map((line, idx) => {
-            // استخراج الاسم والدرجة (يدعم الفاصلة أو الشرطة أو المسافات أو Tab)
             const match = line.match(/^(.+?)[\t\-:,،]+([0-9]+(?:\.[0-9]+)?)$/) || line.match(/^(.+?)\s+([0-9]+(?:\.[0-9]+)?)$/);
             if (!match) {
               return { id: idx, rawLine: line, rawName: line, score: '', matchedStudent: null, status: 'invalid' };
@@ -1731,7 +2003,7 @@
         }
       };
 
-      // نشر الدرجات المطابقة فقط
+      // نشر الدرجات بمعرّف ثابت وباستخدام writeBatch (500 عملية كحد أقصى للدفعة) لمنع التكرار
       const handlePublishMatchedGrades = async () => {
         const matchedItems = parsedRows.filter(r => r.status === 'matched' && r.matchedStudent);
         if (matchedItems.length === 0) {
@@ -1741,30 +2013,65 @@
 
         setPublishingGrades(true);
         try {
-          const { db, collection, addDoc, serverTimestamp } = window.fb;
+          const { db, doc, getDocs, collection, writeBatch, serverTimestamp } = window.fb;
           const cleanSubj = cleanSpaces(gradeSubject);
           const cleanDept = cleanSpaces(gradeDept);
+          const finalExamTitle = cleanSpaces(gradeExamTitle) || `امتحان يومي - ${cleanSubj}`;
           const basePath = getIsolatedBasePath(session.branchId, gradeStage, gradeStudyType, cleanDept);
-          const resultsRef = collection(db, `${basePath}/results`);
+          const resultsColRef = collection(db, `${basePath}/results`);
 
+          // جلب المعرّفات الموجودة مسبقاً لحساب عدد الدرجات المضافة مقابل المحدّثة
+          const existingSnap = await getDocs(resultsColRef);
+          const existingIds = new Set(existingSnap.docs.map(d => d.id));
+
+          // إزالة التكرار داخل نفس القائمة المرفوعة إن وُجد (الاعتماد على آخر سطر للطالب)
+          const uniqueMap = new Map();
           for (const item of matchedItems) {
-            await addDoc(resultsRef, {
-              studentId: item.matchedStudent.id,
-              studentName: item.matchedStudent.fullName,
-              subjectName: cleanSubj,
-              examType: 'daily',
-              examTitle: cleanSpaces(gradeExamTitle) || `امتحان يومي - ${cleanSubj}`,
-              score: item.score,
-              doctorName: session.doctorName,
-              branchId: session.branchId,
-              stageId: gradeStage,
-              studyTypeId: gradeStudyType,
-              departmentName: cleanDept,
-              createdAt: serverTimestamp()
-            });
+            const stuId = item.matchedStudent.studentId || item.matchedStudent.id;
+            const docId = buildResultDocId(stuId, cleanSubj, 'daily', finalExamTitle);
+            uniqueMap.set(docId, { docId, stuId, item });
           }
 
-          notify(`تم نشر ${matchedItems.length} درجة بنجاح للطلاب المطابقين!`, 'success');
+          const entries = Array.from(uniqueMap.values());
+          let addedCount = 0;
+          let updatedCount = 0;
+
+          // تقسيم العمليات إلى دفعات بحد أقصى 500 عملية في كل writeBatch
+          const BATCH_LIMIT = 500;
+          for (let i = 0; i < entries.length; i += BATCH_LIMIT) {
+            const chunk = entries.slice(i, i + BATCH_LIMIT);
+            const batch = writeBatch(db);
+
+            for (const { docId, stuId, item } of chunk) {
+              if (existingIds.has(docId)) {
+                updatedCount++;
+              } else {
+                addedCount++;
+              }
+
+              const targetRef = doc(db, `${basePath}/results/${docId}`);
+              batch.set(targetRef, {
+                studentId: stuId,
+                studentName: item.matchedStudent.fullName,
+                subjectName: cleanSubj,
+                examType: 'daily',
+                examTitle: finalExamTitle,
+                score: item.score,
+                doctorId: doctorUid,
+                doctorName: session.doctorName,
+                branchId: session.branchId,
+                stageId: gradeStage,
+                studyTypeId: gradeStudyType,
+                departmentName: cleanDept,
+                departmentId: slugifyDept(cleanDept),
+                updatedAt: serverTimestamp()
+              }, { merge: true });
+            }
+
+            await batch.commit();
+          }
+
+          notify(`تم نشر الدرجات بنجاح! (أُضيفت: ${addedCount}، حُدّثت: ${updatedCount})`, 'success');
           setReviewMode(false);
           setRawPasteText('');
           setParsedRows([]);
@@ -1776,39 +2083,8 @@
         }
       };
 
-      // رفع صورة الجدول للقسم والمرحلة
-      const handleUploadSchedule = async (e) => {
-        e.preventDefault();
-        const cleanDept = cleanSpaces(schedDept);
-        if (!cleanDept || !schedFile) {
-          notify('يرجى تحديد القسم واختيار صورة الجدول', 'error');
-          return;
-        }
-        setUploading(true);
-        try {
-          const { storage, ref, uploadBytesResumable, getDownloadURL, db, doc, setDoc, serverTimestamp } = window.fb;
-          const basePath = getIsolatedBasePath(session.branchId, schedStage, schedStudyType, cleanDept);
-          const storageRef = ref(storage, `${basePath}/schedule_${Date.now()}_${schedFile.name}`);
-          const task = await uploadBytesResumable(storageRef, schedFile);
-          const imageUrl = await getDownloadURL(task.ref);
-
-          await setDoc(doc(db, `${basePath}/schedule/current`), {
-            imageUrl,
-            updatedBy: session.doctorName,
-            updatedAt: serverTimestamp()
-          });
-          notify('تم رفع صورة الجدول بنجاح!', 'success');
-          setSchedFile(null);
-        } catch (err) {
-          notify('حدث خطأ أثناء رفع الجدول', 'error');
-        } finally {
-          setUploading(false);
-        }
-      };
-
       return (
         <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
-          {/* بطاقة معلومات الدكتور */}
           <div className="bg-gradient-to-l from-slate-900 to-ntu-900 rounded-3xl p-5 sm:p-6 text-white shadow-lg">
             <span className="px-3 py-1 rounded-full bg-ntu-600/40 text-ntu-100 text-xs font-bold">لوحة تحكم التدريسي</span>
             <h2 className="text-xl sm:text-2xl font-extrabold mt-2">{session.doctorName}</h2>
@@ -1817,8 +2093,7 @@
             </p>
           </div>
 
-          {/* أزرار التبويب */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => setActiveTab('lectures')}
               className={`p-3.5 rounded-2xl font-extrabold text-xs sm:text-sm border-2 transition ${
@@ -1835,17 +2110,8 @@
             >
               امتحانات يومية
             </button>
-            <button
-              onClick={() => setActiveTab('schedule')}
-              className={`p-3.5 rounded-2xl font-extrabold text-xs sm:text-sm border-2 transition ${
-                activeTab === 'schedule' ? 'bg-ntu-700 text-white border-ntu-700' : 'bg-white text-slate-700 border-slate-200'
-              }`}
-            >
-              رفع جدول دراسي
-            </button>
           </div>
 
-          {/* تبويب 1: إنشاء محاضرات */}
           {activeTab === 'lectures' && (
             <div className="space-y-6">
               <form onSubmit={handleAddLecture} className="glass-card rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
@@ -1913,36 +2179,59 @@
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">القسم</label>
-                    <input
-                      type="text"
+                    <select
                       value={deptName}
                       onChange={(e) => setDeptName(e.target.value)}
-                      placeholder="اسم القسم الكامل"
-                      className="w-full p-3 rounded-2xl border border-slate-300 outline-none focus:ring-2 focus:ring-ntu-600"
-                    />
+                      className="w-full p-3 rounded-2xl border border-slate-300 bg-white font-semibold outline-none focus:ring-2 focus:ring-ntu-600"
+                    >
+                      {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">ملف المحاضرة (PDF / Word / PowerPoint)</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">ملف المحاضرة (PDF / Word / PowerPoint - بحد أقصى 50 ميجابايت)</label>
                   <input
+                    ref={lectureFileInputRef}
                     type="file"
                     accept=".pdf,.doc,.docx,.ppt,.pptx"
+                    disabled={uploading}
                     onChange={(e) => setLectureFile(e.target.files?.[0] || null)}
                     className="w-full p-3 rounded-2xl border border-dashed border-ntu-400 bg-ntu-50/40 text-sm"
                   />
                 </div>
+
+                {uploading && (
+                  <div className="p-4 rounded-2xl bg-ntu-50 border border-ntu-200 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs sm:text-sm font-extrabold text-ntu-800">
+                      <span>جاري رفع المحاضرة...</span>
+                      <span>{uploadProgress}%</span>
+                    </div>
+                    <div className="w-full h-3 bg-ntu-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-ntu-700 transition-all duration-200"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCancelLectureUpload}
+                      className="w-full py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-xs transition"
+                    >
+                      إلغاء الرفع
+                    </button>
+                  </div>
+                )}
 
                 <button
                   type="submit"
                   disabled={uploading}
                   className="w-full py-3.5 rounded-2xl bg-ntu-700 hover:bg-ntu-800 disabled:opacity-60 text-white font-bold shadow-md transition"
                 >
-                  {uploading ? 'جاري رفع المحاضرة...' : 'إضافة المحاضرة'}
+                  {uploading ? `جاري الرفع (${uploadProgress}%)...` : 'إضافة المحاضرة'}
                 </button>
               </form>
 
-              {/* قائمة محاضرات الدكتور (إدارة وحذف وتعديل) */}
               <div className="glass-card rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
                 <h3 className="text-lg font-extrabold text-slate-900">محاضراتي المنشورة ({myLectures.length})</h3>
                 {myLectures.length === 0 ? (
@@ -1968,7 +2257,7 @@
                             تعديل
                           </button>
                           <button
-                            onClick={() => handleDeleteLecture(lec)}
+                            onClick={() => setLectureToDelete(lec)}
                             className="px-3.5 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-xs"
                           >
                             حذف
@@ -1980,7 +2269,6 @@
                 )}
               </div>
 
-              {/* نافذة تعديل عنوان المحاضرة */}
               {editingLecture && (
                 <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
                   <div className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4">
@@ -1998,10 +2286,17 @@
                   </div>
                 </div>
               )}
+
+              <ConfirmModal
+                isOpen={!!lectureToDelete}
+                title="تأكيد حذف المحاضرة"
+                message={`هل أنت متأكد من حذف المحاضرة "${lectureToDelete?.title || ''}"؟ لا يمكن التراجع عن هذا الإجراء.`}
+                onConfirm={confirmDeleteLecture}
+                onCancel={() => setLectureToDelete(null)}
+              />
             </div>
           )}
 
-          {/* تبويب 2: الامتحانات اليومية ومطابقة الأسماء */}
           {activeTab === 'daily_grades' && (
             <div className="glass-card rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
               <h3 className="text-lg font-extrabold text-slate-900">نشر درجات الامتحانات اليومية</h3>
@@ -2044,13 +2339,13 @@
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">القسم</label>
-                  <input
-                    type="text"
+                  <select
                     value={gradeDept}
                     onChange={(e) => setGradeDept(e.target.value)}
-                    placeholder="اسم القسم الكامل"
-                    className="w-full p-3 rounded-2xl border border-slate-300 outline-none"
-                  />
+                    className="w-full p-3 rounded-2xl border border-slate-300 bg-white font-semibold outline-none"
+                  >
+                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
                 </div>
               </div>
 
@@ -2125,7 +2420,7 @@
                     <button
                       onClick={handlePublishMatchedGrades}
                       disabled={publishingGrades}
-                      className="flex-2 py-3 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow"
+                      className="flex-[2] py-3 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow"
                     >
                       {publishingGrades ? 'جاري النشر...' : 'تأكيد ونشر الدرجات المطابقة'}
                     </button>
@@ -2134,49 +2429,6 @@
               )}
             </div>
           )}
-
-          {/* تبويب 3: رفع الجدول */}
-          {activeTab === 'schedule' && (
-            <form onSubmit={handleUploadSchedule} className="glass-card rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
-              <h3 className="text-lg font-extrabold text-slate-900">رفع صورة الجدول الدراسي</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">المرحلة</label>
-                  <select value={schedStage} onChange={(e) => setSchedStage(e.target.value)} className="w-full p-3 rounded-2xl border border-slate-300 bg-white font-semibold">
-                    {STAGES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">نوع الدراسة</label>
-                  <select value={schedStudyType} onChange={(e) => setSchedStudyType(e.target.value)} className="w-full p-3 rounded-2xl border border-slate-300 bg-white font-semibold">
-                    {STUDY_TYPES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">القسم</label>
-                  <input
-                    type="text"
-                    value={schedDept}
-                    onChange={(e) => setSchedDept(e.target.value)}
-                    placeholder="اسم القسم الكامل"
-                    className="w-full p-3 rounded-2xl border border-slate-300 outline-none"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">صورة الجدول</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setSchedFile(e.target.files?.[0] || null)}
-                  className="w-full p-3 rounded-2xl border border-dashed border-ntu-400 bg-ntu-50/40 text-sm"
-                />
-              </div>
-              <button type="submit" disabled={uploading} className="w-full py-3.5 rounded-2xl bg-ntu-700 text-white font-bold">
-                {uploading ? 'جاري الرفع...' : 'نشر الجدول الدراسي'}
-              </button>
-            </form>
-          )}
         </div>
       );
     }
@@ -2184,28 +2436,46 @@
     // ==========================================
     // 7. واجهة مقرر القسم (Department Coordinator)
     // ==========================================
-    function CoordinatorDashboard({ session, notify }) {
+    function CoordinatorDashboard({ session, departments, notify }) {
+      const [activeSection, setActiveSection] = useState('results'); // 'results' | 'schedule'
       const [selectedExamType, setSelectedExamType] = useState(null); // 'sem1_mid' | 'sem1_final' | 'sem2_mid' | 'sem2_final'
       const [branchId, setBranchId] = useState('kirkuk');
       const [stageId, setStageId] = useState('stage1');
       const [studyTypeId, setStudyTypeId] = useState('morning');
-      const [deptName, setDeptName] = useState(session.departmentName || '');
+      const [deptName, setDeptName] = useState(session.departmentName || departments[0] || DEFAULT_DEPARTMENTS[0]);
 
       const [rawText, setRawText] = useState('');
       const [reviewList, setReviewList] = useState([]);
       const [isReviewing, setIsReviewing] = useState(false);
       const [processing, setProcessing] = useState(false);
 
+      // --- حقول رفع الجدول الدراسي لمقرر القسم ---
+      const [schedBranchId, setSchedBranchId] = useState('kirkuk');
+      const [schedStageId, setSchedStageId] = useState('stage1');
+      const [schedStudyTypeId, setSchedStudyTypeId] = useState('morning');
+      const [schedDeptName, setSchedDeptName] = useState(session.departmentName || departments[0] || DEFAULT_DEPARTMENTS[0]);
+      const [schedFile, setSchedFile] = useState(null);
+      const [uploadingSched, setUploadingSched] = useState(false);
+      const [schedProgress, setSchedProgress] = useState(0);
+      const schedUploadTaskRef = useRef(null);
+      const schedFileInputRef = useRef(null);
+
       const examOptions = [
-        { id: 'sem1_mid', label: 'الفصل الأول – ميدتيرم' },
-        { id: 'sem1_final', label: 'الفصل الأول – فاينل' },
-        { id: 'sem2_mid', label: 'الفصل الثاني – ميدتيرم' },
-        { id: 'sem2_final', label: 'الفصل الثاني – فاينل' }
+        { id: 'sem1_mid', label: 'الفصل الأول – ميدتيرم', maxScore: 40 },
+        { id: 'sem1_final', label: 'الفصل الأول – فاينل', maxScore: 100 },
+        { id: 'sem2_mid', label: 'الفصل الثاني – ميدتيرم', maxScore: 40 },
+        { id: 'sem2_final', label: 'الفصل الثاني – فاينل', maxScore: 100 }
       ];
 
+      // الدرجة العظمى التلقائية حسب نوع الامتحان المختار
+      const currentMaxScore = useMemo(() => {
+        if (!selectedExamType) return null;
+        return selectedExamType.endsWith('_mid') ? 40 : 100;
+      }, [selectedExamType]);
+
       // التحقق من أن مقرر القسم يعدّل قسمه فقط
-      const isAuthorizedDept = () => {
-        return slugifyDept(cleanSpaces(deptName)) === session.departmentId;
+      const isAuthorizedDept = (targetDept = deptName) => {
+        return slugifyDept(cleanSpaces(targetDept)) === session.departmentId;
       };
 
       const handleExcelImport = (e) => {
@@ -2216,7 +2486,6 @@
           const wb = XLSX.read(evt.target.result, { type: 'binary' });
           const ws = wb.Sheets[wb.SheetNames[0]];
           const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-          // التنسيق المتوقع: المادة | اسم الطالب | الدرجة
           const formatted = rows
             .filter(r => r && r.length >= 3 && r[0] && r[1] && r[2] !== undefined)
             .map(r => `${cleanSpaces(String(r[0]))} | ${cleanSpaces(String(r[1]))} | ${String(r[2]).trim()}`);
@@ -2231,7 +2500,7 @@
           notify('يرجى اختيار نوع الامتحان أولاً', 'error');
           return;
         }
-        if (!isAuthorizedDept()) {
+        if (!isAuthorizedDept(deptName)) {
           notify(`غير مصرح لك! يمكنك النشر لقسمك (${session.departmentName}) فقط.`, 'error');
           return;
         }
@@ -2240,6 +2509,7 @@
           return;
         }
 
+        const maxScore = currentMaxScore;
         setProcessing(true);
         try {
           const { db, collection, getDocs } = window.fb;
@@ -2249,25 +2519,66 @@
 
           const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
           const checked = lines.map((line, i) => {
-            // الصيغة: المادة | اسم الطالب | الدرجة (أو مفصولة بـ - أو , أو Tab)
             const parts = line.split(/[\|\t,،\-]+/).map(p => cleanSpaces(p)).filter(Boolean);
             if (parts.length < 3) {
-              return { id: i, rawLine: line, subject: '', rawName: line, score: '', matchedStudent: null, status: 'invalid' };
+              return { id: i, rawLine: line, subject: '', rawName: line, score: '', matchedStudent: null, status: 'invalid', errorReason: 'تنسيق السطر غير مكتمل' };
             }
             const subject = parts[0];
-            const score = parts[parts.length - 1];
+            const scoreStr = parts[parts.length - 1];
             const rawName = parts.slice(1, parts.length - 1).join(' ');
             const normName = normalizeArabic(rawName);
 
             const found = students.find(s => s.normalizedName === normName);
+            const numericScore = Number(scoreStr);
+
+            if (!found) {
+              return {
+                id: i,
+                rawLine: line,
+                subject,
+                rawName,
+                score: scoreStr,
+                matchedStudent: null,
+                status: 'unmatched',
+                errorReason: 'الاسم غير مسجل في هذا القسم/المرحلة'
+              };
+            }
+
+            if (scoreStr === '' || Number.isNaN(numericScore) || numericScore < 0) {
+              return {
+                id: i,
+                rawLine: line,
+                subject,
+                rawName,
+                score: scoreStr,
+                matchedStudent: found,
+                status: 'invalid_score',
+                errorReason: 'الدرجة المدخلة غير رقمية أو غير صالحة'
+              };
+            }
+
+            if (numericScore > maxScore) {
+              return {
+                id: i,
+                rawLine: line,
+                subject,
+                rawName,
+                score: scoreStr,
+                matchedStudent: found,
+                status: 'invalid_score',
+                errorReason: `الدرجة (${numericScore}) تتجاوز الدرجة العظمى المحددة (${maxScore})`
+              };
+            }
+
             return {
               id: i,
               rawLine: line,
               subject,
               rawName,
-              score,
-              matchedStudent: found || null,
-              status: found ? 'matched' : 'unmatched'
+              score: numericScore,
+              matchedStudent: found,
+              status: 'matched',
+              errorReason: ''
             };
           });
 
@@ -2281,38 +2592,73 @@
         }
       };
 
+      // نشر النتائج بمعرّف ثابت وباستخدام writeBatch (500 عملية كحد أقصى للدفعة) لمنع التكرار
       const handlePublishResults = async () => {
         const validRows = reviewList.filter(r => r.status === 'matched' && r.matchedStudent);
         if (validRows.length === 0) {
-          notify('لا توجد سجلات مطابقة للنشر', 'error');
+          notify('لا توجد سجلات صحيحة ومطابقة للنشر', 'error');
           return;
         }
 
+        const maxScore = currentMaxScore;
         setProcessing(true);
         try {
-          const { db, collection, addDoc, serverTimestamp } = window.fb;
+          const { db, doc, getDocs, collection, writeBatch, serverTimestamp } = window.fb;
           const basePath = getIsolatedBasePath(branchId, stageId, studyTypeId, session.departmentName);
-          const resultsRef = collection(db, `${basePath}/results`);
+          const resultsColRef = collection(db, `${basePath}/results`);
           const examLabel = examOptions.find(o => o.id === selectedExamType)?.label || selectedExamType;
 
+          // جلب المعرّفات الموجودة مسبقاً لحساب المضاف والمحدّث
+          const existingSnap = await getDocs(resultsColRef);
+          const existingIds = new Set(existingSnap.docs.map(d => d.id));
+
+          // إزالة التكرار داخل نفس القائمة المرفوعة لنفس الطالب والمادة
+          const uniqueMap = new Map();
           for (const row of validRows) {
-            await addDoc(resultsRef, {
-              studentId: row.matchedStudent.id,
-              studentName: row.matchedStudent.fullName,
-              subjectName: row.subject,
-              examType: selectedExamType,
-              examTitle: `${row.subject} (${examLabel})`,
-              score: row.score,
-              publishedBy: 'مقرر القسم',
-              branchId,
-              stageId,
-              studyTypeId,
-              departmentName: session.departmentName,
-              createdAt: serverTimestamp()
-            });
+            const stuId = row.matchedStudent.studentId || row.matchedStudent.id;
+            const docId = buildResultDocId(stuId, row.subject, selectedExamType, '');
+            uniqueMap.set(docId, { docId, stuId, row });
           }
 
-          notify(`تم نشر ${validRows.length} نتيجة بنجاح في (${examLabel})!`, 'success');
+          const entries = Array.from(uniqueMap.values());
+          let addedCount = 0;
+          let updatedCount = 0;
+
+          const BATCH_LIMIT = 500;
+          for (let i = 0; i < entries.length; i += BATCH_LIMIT) {
+            const chunk = entries.slice(i, i + BATCH_LIMIT);
+            const batch = writeBatch(db);
+
+            for (const { docId, stuId, row } of chunk) {
+              if (existingIds.has(docId)) {
+                updatedCount++;
+              } else {
+                addedCount++;
+              }
+
+              const targetRef = doc(db, `${basePath}/results/${docId}`);
+              batch.set(targetRef, {
+                studentId: stuId,
+                studentName: row.matchedStudent.fullName,
+                subjectName: row.subject,
+                examType: selectedExamType,
+                examTitle: `${row.subject} (${examLabel})`,
+                score: row.score,
+                maxScore,
+                publishedBy: 'مقرر القسم',
+                branchId,
+                stageId,
+                studyTypeId,
+                departmentName: session.departmentName,
+                departmentId: session.departmentId,
+                updatedAt: serverTimestamp()
+              }, { merge: true });
+            }
+
+            await batch.commit();
+          }
+
+          notify(`تم نشر النتائج بنجاح في (${examLabel})! (أُضيفت: ${addedCount}، حُدّثت: ${updatedCount})`, 'success');
           setIsReviewing(false);
           setRawText('');
           setReviewList([]);
@@ -2324,127 +2670,310 @@
         }
       };
 
+      // إلغاء رفع الجدول
+      const handleCancelScheduleUpload = () => {
+        if (schedUploadTaskRef.current) {
+          try {
+            schedUploadTaskRef.current.cancel();
+          } catch (_) {}
+          schedUploadTaskRef.current = null;
+        }
+        setUploadingSched(false);
+        setSchedProgress(0);
+      };
+
+      // رفع صورة الجدول الدراسي لمقرر القسم فقط
+      const handleCoordinatorUploadSchedule = async (e) => {
+        e.preventDefault();
+        if (uploadingSched) return;
+
+        if (!isAuthorizedDept(schedDeptName)) {
+          notify(`غير مصرح لك! يمكنك رفع الجدول لقسمك (${session.departmentName}) فقط.`, 'error');
+          return;
+        }
+        if (!schedFile) {
+          notify('يرجى اختيار صورة الجدول الدراسي أولاً', 'error');
+          return;
+        }
+        if (schedFile.size > MAX_UPLOAD_SIZE_BYTES) {
+          notify('حجم الصورة يتجاوز الحد الأقصى المسموح به (50 ميجابايت)', 'error');
+          return;
+        }
+
+        setUploadingSched(true);
+        setSchedProgress(0);
+        try {
+          const { storage, ref, db, doc, setDoc, serverTimestamp } = window.fb;
+          const basePath = getIsolatedBasePath(schedBranchId, schedStageId, schedStudyTypeId, session.departmentName);
+          const safeFileName = sanitizeStorageFileName(schedFile.name);
+          const storageRef = ref(storage, `${basePath}/schedule_${Date.now()}_${safeFileName}`);
+
+          const imageUrl = await uploadFileWithProgress({
+            storageRef,
+            file: schedFile,
+            onProgress: (pct) => setSchedProgress(pct),
+            onTaskCreated: (task) => { schedUploadTaskRef.current = task; }
+          });
+
+          await setDoc(doc(db, `${basePath}/schedule/current`), {
+            imageUrl,
+            departmentId: session.departmentId,
+            updatedBy: `مقرر القسم (${session.departmentName})`,
+            updatedAt: serverTimestamp()
+          });
+
+          notify('تم رفع ونشر صورة الجدول الدراسي بنجاح!', 'success');
+          setSchedFile(null);
+          if (schedFileInputRef.current) schedFileInputRef.current.value = '';
+        } catch (err) {
+          console.error('Schedule upload error:', err);
+          notify(getStorageErrorMessage(err), 'error');
+        } finally {
+          schedUploadTaskRef.current = null;
+          setUploadingSched(false);
+          setSchedProgress(0);
+        }
+      };
+
       return (
         <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
           <div className="bg-gradient-to-l from-amber-800 to-amber-600 rounded-3xl p-5 sm:p-6 text-white shadow-lg">
             <span className="px-3 py-1 rounded-full bg-white/20 text-xs font-bold">لوحة مقرر القسم</span>
             <h2 className="text-xl sm:text-2xl font-extrabold mt-2">{session.departmentName}</h2>
-            <p className="text-xs sm:text-sm text-amber-100 mt-1">إدارة ونشر نتائج الفصول الدراسية المستقلة</p>
+            <p className="text-xs sm:text-sm text-amber-100 mt-1">إدارة ونشر نتائج الفصول الدراسية والجدول الأسبوعي</p>
           </div>
 
-          {/* أزرار النتائج المستقلة */}
-          <div className="glass-card rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
-            <h3 className="text-lg font-extrabold text-slate-900">نتائج الامتحانات الفصلية</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setActiveSection('results')}
+              className={`p-3.5 rounded-2xl font-extrabold text-xs sm:text-sm border-2 transition ${
+                activeSection === 'results' ? 'bg-ntu-700 text-white border-ntu-700 shadow-md' : 'bg-white text-slate-700 border-slate-200 hover:border-ntu-400'
+              }`}
+            >
+              نتائج الامتحانات الفصلية
+            </button>
+            <button
+              onClick={() => setActiveSection('schedule')}
+              className={`p-3.5 rounded-2xl font-extrabold text-xs sm:text-sm border-2 transition ${
+                activeSection === 'schedule' ? 'bg-ntu-700 text-white border-ntu-700 shadow-md' : 'bg-white text-slate-700 border-slate-200 hover:border-ntu-400'
+              }`}
+            >
+              رفع الجدول
+            </button>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {examOptions.map(opt => (
-                <button
-                  key={opt.id}
-                  onClick={() => { setSelectedExamType(opt.id); setIsReviewing(false); }}
-                  className={`p-4 rounded-2xl font-extrabold text-sm border-2 transition ${
-                    selectedExamType === opt.id
-                      ? 'bg-ntu-700 text-white border-ntu-700 shadow-md'
-                      : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-ntu-400'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
-            {selectedExamType && (
-              <div className="pt-4 border-t border-slate-100 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">الفرع</label>
-                    <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="w-full p-3 rounded-2xl border border-slate-300 bg-white font-semibold text-sm">
-                      {BRANCHES.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">المرحلة</label>
-                    <select value={stageId} onChange={(e) => setStageId(e.target.value)} className="w-full p-3 rounded-2xl border border-slate-300 bg-white font-semibold text-sm">
-                      {STAGES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">نوع الدراسة</label>
-                    <select value={studyTypeId} onChange={(e) => setStudyTypeId(e.target.value)} className="w-full p-3 rounded-2xl border border-slate-300 bg-white font-semibold text-sm">
-                      {STUDY_TYPES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">القسم</label>
-                    <input
-                      type="text"
-                      value={deptName}
-                      onChange={(e) => setDeptName(e.target.value)}
-                      className="w-full p-3 rounded-2xl border border-slate-300 text-sm font-semibold"
-                    />
-                  </div>
-                </div>
-
-                {!isReviewing ? (
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-dashed border-slate-300">
-                      <label className="block text-sm font-bold text-slate-700 mb-2">
-                        رفع ملف Excel / CSV (الأعمدة: المادة | اسم الطالب الرباعي | الدرجة)
-                      </label>
-                      <input type="file" accept=".xlsx,.xls,.csv" onChange={handleExcelImport} className="text-sm" />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">
-                        أو نسخ ولصق النتائج (الصيغة: المادة | الاسم الرباعي | الدرجة)
-                      </label>
-                      <textarea
-                        rows={6}
-                        value={rawText}
-                        onChange={(e) => setRawText(e.target.value)}
-                        placeholder={"طفيليات | أحمد محمد علي حسن | 45\nكيمياء حياتية | سارة خالد جاسم محمود | 48"}
-                        className="w-full p-3.5 rounded-2xl border border-slate-300 outline-none font-mono text-sm"
-                      />
-                    </div>
-
-                    <button
-                      onClick={handleVerifyCoordinatorData}
-                      disabled={processing}
-                      className="w-full py-3.5 rounded-2xl bg-ntu-700 hover:bg-ntu-800 text-white font-bold shadow-md"
-                    >
-                      {processing ? 'جاري التحقق...' : 'فحص ومراجعة النتائج قبل النشر'}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-sm font-bold text-amber-900">
-                      السجلات المطابقة: {reviewList.filter(r => r.status === 'matched').length} من أصل {reviewList.length}
-                    </div>
-
-                    <div className="max-h-72 overflow-y-auto space-y-2 border border-slate-200 rounded-2xl p-3">
-                      {reviewList.map(r => (
-                        <div key={r.id} className={`p-3 rounded-xl flex items-center justify-between text-sm ${r.status === 'matched' ? 'bg-emerald-50 border border-emerald-200' : 'bg-rose-50 border border-rose-200'}`}>
-                          <div>
-                            <span className="font-bold text-ntu-800">[{r.subject}]</span> — <span className="font-bold">{r.rawName}</span>
-                            <span className="block text-xs mt-0.5">
-                              {r.status === 'matched' ? '✓ مطابق لحساب الطالب' : '✕ الاسم غير مسجل في هذا القسم/المرحلة'}
-                            </span>
-                          </div>
-                          <span className="font-extrabold px-3 py-1 rounded-lg bg-white border">{r.score}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex gap-3">
-                      <button onClick={() => setIsReviewing(false)} className="flex-1 py-3 rounded-2xl bg-slate-200 font-bold">رجوع للتعديل</button>
-                      <button onClick={handlePublishResults} disabled={processing} className="flex-2 py-3 px-6 rounded-2xl bg-emerald-600 text-white font-bold shadow">
-                        {processing ? 'جاري النشر...' : 'نشر النتائج الآن'}
-                      </button>
-                    </div>
-                  </div>
+          {activeSection === 'results' && (
+            <div className="glass-card rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-lg font-extrabold text-slate-900">نتائج الامتحانات الفصلية</h3>
+                {currentMaxScore !== null && (
+                  <span className="px-3.5 py-1.5 rounded-xl bg-amber-100 border border-amber-300 text-amber-900 font-extrabold text-xs sm:text-sm">
+                    الدرجة العظمى: {currentMaxScore}
+                  </span>
                 )}
               </div>
-            )}
-          </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {examOptions.map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => { setSelectedExamType(opt.id); setIsReviewing(false); }}
+                    className={`p-4 rounded-2xl font-extrabold text-sm border-2 transition ${
+                      selectedExamType === opt.id
+                        ? 'bg-ntu-700 text-white border-ntu-700 shadow-md'
+                        : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-ntu-400'
+                    }`}
+                  >
+                    <span>{opt.label}</span>
+                    <span className={`block text-xs mt-1 font-bold ${selectedExamType === opt.id ? 'text-ntu-100' : 'text-slate-500'}`}>
+                      من {opt.maxScore}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {selectedExamType && (
+                <div className="pt-4 border-t border-slate-100 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">الفرع</label>
+                      <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="w-full p-3 rounded-2xl border border-slate-300 bg-white font-semibold text-sm">
+                        {BRANCHES.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">المرحلة</label>
+                      <select value={stageId} onChange={(e) => setStageId(e.target.value)} className="w-full p-3 rounded-2xl border border-slate-300 bg-white font-semibold text-sm">
+                        {STAGES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">نوع الدراسة</label>
+                      <select value={studyTypeId} onChange={(e) => setStudyTypeId(e.target.value)} className="w-full p-3 rounded-2xl border border-slate-300 bg-white font-semibold text-sm">
+                        {STUDY_TYPES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">القسم</label>
+                      <select
+                        value={deptName}
+                        onChange={(e) => setDeptName(e.target.value)}
+                        className="w-full p-3 rounded-2xl border border-slate-300 bg-white text-sm font-semibold"
+                      >
+                        {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {!isReviewing ? (
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-dashed border-slate-300">
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                          رفع ملف Excel / CSV (الأعمدة: المادة | اسم الطالب الرباعي | الدرجة من {currentMaxScore})
+                        </label>
+                        <input type="file" accept=".xlsx,.xls,.csv" onChange={handleExcelImport} className="text-sm" />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">
+                          أو نسخ ولصق النتائج (الصيغة: المادة | الاسم الرباعي | الدرجة من {currentMaxScore})
+                        </label>
+                        <textarea
+                          rows={6}
+                          value={rawText}
+                          onChange={(e) => setRawText(e.target.value)}
+                          placeholder={currentMaxScore === 40
+                            ? "طفيليات | أحمد محمد علي حسن | 35\nكيمياء حياتية | سارة خالد جاسم محمود | 38"
+                            : "طفيليات | أحمد محمد علي حسن | 88\nكيمياء حياتية | سارة خالد جاسم محمود | 92"}
+                          className="w-full p-3.5 rounded-2xl border border-slate-300 outline-none font-mono text-sm"
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleVerifyCoordinatorData}
+                        disabled={processing}
+                        className="w-full py-3.5 rounded-2xl bg-ntu-700 hover:bg-ntu-800 text-white font-bold shadow-md"
+                      >
+                        {processing ? 'جاري التحقق...' : 'فحص ومراجعة النتائج قبل النشر'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-sm font-bold text-amber-900 flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                          السجلات الصحيحة والمطابقة: {reviewList.filter(r => r.status === 'matched').length} من أصل {reviewList.length}
+                        </span>
+                        <span>الدرجة العظمى: {currentMaxScore}</span>
+                      </div>
+
+                      <div className="max-h-72 overflow-y-auto space-y-2 border border-slate-200 rounded-2xl p-3">
+                        {reviewList.map(r => (
+                          <div key={r.id} className={`p-3 rounded-xl flex items-center justify-between text-sm ${r.status === 'matched' ? 'bg-emerald-50 border border-emerald-200' : 'bg-rose-50 border border-rose-200'}`}>
+                            <div>
+                              {r.subject && <><span className="font-bold text-ntu-800">[{r.subject}]</span> — </>}
+                              <span className="font-bold">{r.rawName}</span>
+                              <span className="block text-xs mt-0.5 font-semibold">
+                                {r.status === 'matched' ? `✓ مطابق لحساب الطالب` : `✕ ${r.errorReason}`}
+                              </span>
+                            </div>
+                            <span className="font-extrabold px-3 py-1 rounded-lg bg-white border" dir="ltr">
+                              {r.score !== '' ? `${r.score} / ${currentMaxScore}` : '—'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex gap-3">
+                        <button onClick={() => setIsReviewing(false)} className="flex-1 py-3 rounded-2xl bg-slate-200 font-bold">رجوع للتعديل</button>
+                        <button onClick={handlePublishResults} disabled={processing} className="flex-[2] py-3 px-6 rounded-2xl bg-emerald-600 text-white font-bold shadow">
+                          {processing ? 'جاري النشر...' : 'نشر النتائج الآن'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeSection === 'schedule' && (
+            <form onSubmit={handleCoordinatorUploadSchedule} className="glass-card rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+              <h3 className="text-lg font-extrabold text-slate-900">رفع صورة الجدول الدراسي</h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">الفرع</label>
+                  <select value={schedBranchId} onChange={(e) => setSchedBranchId(e.target.value)} className="w-full p-3 rounded-2xl border border-slate-300 bg-white font-semibold text-sm">
+                    {BRANCHES.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">المرحلة</label>
+                  <select value={schedStageId} onChange={(e) => setSchedStageId(e.target.value)} className="w-full p-3 rounded-2xl border border-slate-300 bg-white font-semibold text-sm">
+                    {STAGES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">نوع الدراسة</label>
+                  <select value={schedStudyTypeId} onChange={(e) => setSchedStudyTypeId(e.target.value)} className="w-full p-3 rounded-2xl border border-slate-300 bg-white font-semibold text-sm">
+                    {STUDY_TYPES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">القسم</label>
+                  <select
+                    value={schedDeptName}
+                    onChange={(e) => setSchedDeptName(e.target.value)}
+                    className="w-full p-3 rounded-2xl border border-slate-300 bg-white text-sm font-semibold outline-none"
+                  >
+                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">صورة الجدول (بحد أقصى 50 ميجابايت)</label>
+                <input
+                  ref={schedFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  disabled={uploadingSched}
+                  onChange={(e) => setSchedFile(e.target.files?.[0] || null)}
+                  className="w-full p-3 rounded-2xl border border-dashed border-ntu-400 bg-ntu-50/40 text-sm"
+                />
+              </div>
+
+              {uploadingSched && (
+                <div className="p-4 rounded-2xl bg-ntu-50 border border-ntu-200 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs sm:text-sm font-extrabold text-ntu-800">
+                    <span>جاري رفع صورة الجدول...</span>
+                    <span>{schedProgress}%</span>
+                  </div>
+                  <div className="w-full h-3 bg-ntu-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-ntu-700 transition-all duration-200"
+                      style={{ width: `${schedProgress}%` }}
+                    ></div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelScheduleUpload}
+                    className="w-full py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-xs transition"
+                  >
+                    إلغاء الرفع
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={uploadingSched}
+                className="w-full py-3.5 rounded-2xl bg-ntu-700 hover:bg-ntu-800 disabled:opacity-60 text-white font-bold shadow-md transition"
+              >
+                {uploadingSched ? `جاري الرفع (${schedProgress}%)...` : 'نشر الجدول الدراسي'}
+              </button>
+            </form>
+          )}
         </div>
       );
     }
@@ -2454,20 +2983,10 @@
     // ==========================================
     function App() {
       const [fbReady, setFbReady] = useState(!!window.fb);
-      const [authReady, setAuthReady] = useState(false);
-      const [authConfig, setAuthConfig] = useState(DEFAULT_AUTH_CONFIG);
-      const [logoUrl, setLogoUrl] = useState('');
-      const [uploadingLogo, setUploadingLogo] = useState(false);
-
-      // جلسة الدخول (مسموح بحفظها في localStorage حسب المتطلبات)
-      const [userSession, setUserSession] = useState(() => {
-        try {
-          const saved = localStorage.getItem('ntu_platform_session');
-          return saved ? JSON.parse(saved) : null;
-        } catch {
-          return null;
-        }
-      });
+      const [authChecked, setAuthChecked] = useState(false);
+      const [departments, setDepartments] = useState(DEFAULT_DEPARTMENTS);
+      const [logoUrl, setLogoUrl] = useState(NTU_DEFAULT_LOGO);
+      const [userSession, setUserSession] = useState(null);
 
       const [profileOpen, setProfileOpen] = useState(false);
       const [toast, setToast] = useState({ message: '', type: 'success' });
@@ -2477,7 +2996,6 @@
         setTimeout(() => setToast({ message: '', type: 'success' }), 4500);
       };
 
-      // انتظار تحميل Firebase SDK
       useEffect(() => {
         if (window.fb) {
           setFbReady(true);
@@ -2488,86 +3006,81 @@
         }
       }, []);
 
-      // تسجيل الدخول المجهول في Firebase Auth وجلب إعدادات النظام واللوغو
+      // جلب قائمة الأقسام الرسمية من config/departments وإنشاؤها تلقائياً إن لم توجد
+      const loadOfficialDepartments = async () => {
+        const { db, doc, getDoc, setDoc } = window.fb;
+        try {
+          const deptRef = doc(db, 'config', 'departments');
+          const snap = await getDoc(deptRef);
+          if (snap.exists() && Array.isArray(snap.data().list) && snap.data().list.length > 0) {
+            setDepartments(snap.data().list);
+          } else {
+            await setDoc(deptRef, { list: DEFAULT_DEPARTMENTS });
+            setDepartments(DEFAULT_DEPARTMENTS);
+          }
+        } catch (err) {
+          console.warn('Using default departments list:', err);
+          setDepartments(DEFAULT_DEPARTMENTS);
+        }
+      };
+
+      // الاعتماد الكامل على onAuthStateChanged وقراءة users/{uid} لمنع انتحال الأدوار
       useEffect(() => {
         if (!fbReady) return;
-        const { auth, signInAnonymously, onAuthStateChanged, db, doc, getDoc, setDoc, onSnapshot } = window.fb;
+        const { auth, onAuthStateChanged, db, doc, getDoc, onSnapshot } = window.fb;
 
-        const initAuthAndConfig = async () => {
-          try {
-            await signInAnonymously(auth);
-          } catch (err) {
-            console.error('Auth error:', err);
-          }
-        };
-
-        initAuthAndConfig();
+        loadOfficialDepartments();
 
         const unsubAuth = onAuthStateChanged(auth, async (user) => {
-          if (user) {
-            setAuthReady(true);
-            // جلب أو تهيئة config/auth في Firestore
-            const configRef = doc(db, 'config', 'auth');
-            try {
-              const snap = await getDoc(configRef);
-              if (snap.exists()) {
-                setAuthConfig({ ...DEFAULT_AUTH_CONFIG, ...snap.data() });
-              } else {
-                await setDoc(configRef, DEFAULT_AUTH_CONFIG);
-              }
-            } catch (e) {
-              console.warn('Using default config:', e);
+          if (!user) {
+            setUserSession(null);
+            setAuthChecked(true);
+            return;
+          }
+
+          try {
+            const userSnap = await getDoc(doc(db, 'users', user.uid));
+            if (userSnap.exists()) {
+              setUserSession({ uid: user.uid, ...userSnap.data() });
+            } else {
+              setUserSession(null);
             }
 
-            // الاستماع اللحظي للوغو الجامعة
+            // تحديث قائمة الأقسام واللوغو بعد المصادقة
+            loadOfficialDepartments();
             onSnapshot(doc(db, 'config', 'branding'), (bSnap) => {
               if (bSnap.exists() && bSnap.data().logoUrl) {
                 setLogoUrl(bSnap.data().logoUrl);
+              } else {
+                setLogoUrl(NTU_DEFAULT_LOGO);
               }
-            });
+            }, () => {});
+          } catch (err) {
+            console.error('Error loading user profile:', err);
+            setUserSession(null);
+          } finally {
+            setAuthChecked(true);
           }
         });
 
         return () => unsubAuth();
       }, [fbReady]);
 
-      // رفع لوغو الجامعة إلى Firebase Storage وحفظ رابطه في Firestore
-      const handleLogoUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file || !fbReady) return;
-        setUploadingLogo(true);
-        try {
-          const { storage, ref, uploadBytesResumable, getDownloadURL, db, doc, setDoc } = window.fb;
-          const logoRef = ref(storage, `branding/ntu_logo_${Date.now()}`);
-          const task = await uploadBytesResumable(logoRef, file);
-          const url = await getDownloadURL(task.ref);
-          await setDoc(doc(db, 'config', 'branding'), { logoUrl: url }, { merge: true });
-          notify('تم تحديث لوغو الجامعة بنجاح!', 'success');
-        } catch (err) {
-          console.error(err);
-          notify('تعذر رفع اللوغو، تأكد من صلاحيات التخزين', 'error');
-        } finally {
-          setUploadingLogo(false);
-        }
+      const handleSessionLoaded = (profileObj) => {
+        setUserSession(profileObj);
       };
 
-      const handleLoginSuccess = (sessionObj) => {
-        setUserSession(sessionObj);
+      const handleLogout = async () => {
         try {
-          localStorage.setItem('ntu_platform_session', JSON.stringify(sessionObj));
+          const { auth, signOut } = window.fb;
+          await signOut(auth);
         } catch (_) {}
-      };
-
-      const handleLogout = () => {
         setUserSession(null);
         setProfileOpen(false);
-        try {
-          localStorage.removeItem('ntu_platform_session');
-        } catch (_) {}
         notify('تم تسجيل الخروج بنجاح', 'success');
       };
 
-      if (!fbReady || !authReady) {
+      if (!fbReady || !authChecked) {
         return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
             <div className="w-12 h-12 border-4 border-ntu-200 border-t-ntu-700 rounded-full animate-spin"></div>
@@ -2580,8 +3093,6 @@
         <div className="min-h-screen flex flex-col">
           <Header
             logoUrl={logoUrl}
-            onLogoUpload={handleLogoUpload}
-            uploadingLogo={uploadingLogo}
             userSession={userSession}
             onLogout={handleLogout}
             onOpenProfile={() => setProfileOpen(true)}
@@ -2590,8 +3101,8 @@
           <main className="flex-1">
             {!userSession && (
               <LandingAndAuth
-                authConfig={authConfig}
-                onLoginSuccess={handleLoginSuccess}
+                departments={departments}
+                onSessionLoaded={handleSessionLoaded}
                 notify={notify}
               />
             )}
@@ -2601,11 +3112,11 @@
             )}
 
             {userSession?.role === 'doctor' && (
-              <DoctorDashboard session={userSession} notify={notify} />
+              <DoctorDashboard session={userSession} departments={departments} notify={notify} />
             )}
 
             {userSession?.role === 'coordinator' && (
-              <CoordinatorDashboard session={userSession} notify={notify} />
+              <CoordinatorDashboard session={userSession} departments={departments} notify={notify} />
             )}
           </main>
 
